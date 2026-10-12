@@ -162,7 +162,10 @@ enum Packer {
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("TeleDrop-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         let zip = work.appendingPathComponent(file.lastPathComponent + ".zip")
-        try run("/usr/bin/ditto", ["-c", "-k", "--keepParent", file.path, zip.path])
+        // Folders keep their own name inside the zip; a single file goes in on its own.
+        // --norsrc leaves out macOS-only "._name" metadata files.
+        let keepParent = isDir.boolValue ? ["--keepParent"] : []
+        try run("/usr/bin/ditto", ["-c", "-k", "--norsrc"] + keepParent + [file.path, zip.path])
         if size(of: zip) <= Telegram.partLimit {
             return PreparedFile(parts: [zip], caption: nil, workDir: work)
         }

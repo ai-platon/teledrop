@@ -200,8 +200,10 @@ struct IslandView: View {
                 Text(subtitle)
                     .font(.system(size: expanded ? 12 : 10.5))
                     .foregroundStyle(.white.opacity(0.5))
-                    .lineLimit(1)
+                    // Error hints are sentences: let them wrap instead of cutting the middle out.
+                    .lineLimit(m.phase == .error ? 2 : 1)
                     .truncationMode(.middle)
+                    .fixedSize(horizontal: false, vertical: m.phase == .error)
                 if m.phase == .sending {
                     ProgressBar(value: m.progress)
                         .padding(.top, 5)

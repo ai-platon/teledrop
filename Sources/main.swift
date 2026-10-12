@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Theme.override = Settings.halloween
+        model.halloween = Theme.isHalloween  // the model was created before the saved choice was read
         setUpEditMenu()
         setUpPanel()
         setUpStatusItem()

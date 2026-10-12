@@ -9,10 +9,10 @@ enum Theme {
     /// Set by the app from Settings (nil = automatic: October 20 through November 5).
     static var override: Bool?
 
-    static var isHalloween: Bool { override ?? inSeason }
+    static var isHalloween: Bool { override ?? inSeason() }
 
-    static var inSeason: Bool {
-        let c = Calendar.current.dateComponents([.month, .day], from: Date())
+    static func inSeason(_ date: Date = Date()) -> Bool {
+        let c = Calendar.current.dateComponents([.month, .day], from: date)
         return (c.month == 10 && (c.day ?? 0) >= 20) || (c.month == 11 && (c.day ?? 99) <= 5)
     }
 }
