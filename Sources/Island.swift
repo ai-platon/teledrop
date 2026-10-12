@@ -228,13 +228,17 @@ final class DropView: NSView {
     init(model: DropModel) {
         self.model = model
         super.init(frame: .zero)
-        registerForDraggedTypes([.fileURL] + Self.promiseTypes)
+        registerForDraggedTypes([.fileURL, .URL, .png, .tiff, .string] + Self.promiseTypes)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     static func carriesFiles(_ types: [NSPasteboard.PasteboardType]) -> Bool {
-        types.contains { $0 == .fileURL || promiseTypes.contains($0) || $0.rawValue.hasPrefix("com.apple.pasteboard.promised") }
+        // Files, file promises, links and images open the island (plain text drags inside editors don't).
+        types.contains {
+            $0 == .fileURL || $0 == .URL || $0 == .png || $0 == .tiff
+                || promiseTypes.contains($0) || $0.rawValue.hasPrefix("com.apple.pasteboard.promised")
+        }
     }
 
     /// Only the island (with some slack) accepts drops, not the whole transparent panel.
@@ -258,6 +262,31 @@ final class DropView: NSView {
 
     private var performed = false
 
+    /// Browsers often drag a link instead of a file; images and text can come without a file too.
+    private func acceptNonFile(_ pasteboard: NSPasteboard) -> Bool {
+        if let links = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL],
+           let link = links.first(where: { ["http", "https", "data"].contains($0.scheme?.lowercased() ?? "") }) {
+            model.sendLink(link)
+            return true
+        }
+        if let image = (pasteboard.readObjects(forClasses: [NSImage.self]) as? [NSImage])?.first,
+           let tiff = image.tiffRepresentation,
+           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("Image \(Int(Date().timeIntervalSince1970)).png")
+            if (try? png.write(to: file)) != nil {
+                model.send([file])
+                return true
+            }
+        }
+        if let text = pasteboard.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            model.sendText(text)
+            return true
+        }
+        model.fail(tr("Couldn't read that — try dragging a file", "Не удалось прочитать — перетащи файл",
+                      "Не вдалося прочитати — перетягни файл"))
+        return false
+    }
+
     override func draggingEnded(_ info: NSDraggingInfo) {
         if !performed { model.dropCancelled() }
         performed = false
@@ -278,8 +307,7 @@ final class DropView: NSView {
 
         guard let promises = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self]) as? [NSFilePromiseReceiver],
               !promises.isEmpty else {
-            model.fail(tr("Couldn't read the file", "Не удалось прочитать файл", "Не вдалося прочитати файл"))
-            return false
+            return acceptNonFile(pasteboard)
         }
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("TeleDrop-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

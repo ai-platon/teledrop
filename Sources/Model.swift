@@ -89,16 +89,80 @@ final class DropModel: ObservableObject {
 
     func send(_ urls: [URL]) {
         log("send \(urls.map(\.path))")
-        guard !urls.isEmpty else { phase = .hidden; return }
-        guard let cfg = TGConfig.load() else {
-            fail(tr("Connect a bot first", "Сначала подключи бота", "Спершу підключи бота"))
-            onNeedsSetup?()
+        guard !urls.isEmpty else {
+            fail(tr("Couldn't read that — try dragging a file", "Не удалось прочитать — перетащи файл",
+                    "Не вдалося прочитати — перетягни файл"))
             return
         }
+        guard let cfg = requireConfig() else { return }
         queue = urls
         total = urls.count
         uploading = true
         next(cfg)
+    }
+
+    private func requireConfig() -> TGConfig? {
+        if let cfg = TGConfig.load() { return cfg }
+        fail(tr("Connect a bot first", "Сначала подключи бота", "Спершу підключи бота"))
+        onNeedsSetup?()
+        return nil
+    }
+
+    /// A link dragged from a browser: a file or image behind it is downloaded and sent as a file,
+    /// a web page is sent as a link message.
+    func sendLink(_ url: URL) {
+        log("send link \(url.absoluteString.prefix(150))")
+        guard let cfg = requireConfig() else { return }
+        uploading = true
+        total = 1
+        progress = 0
+        detail = url.host ?? tr("link", "ссылка", "посилання")
+        phase = .sending
+        Task { @MainActor in
+            do {
+                // Peek at the headers first, so a web page isn't downloaded for nothing.
+                let (bytes, response) = try await URLSession.shared.bytes(from: url)
+                bytes.task.cancel()
+                let isPage = url.scheme != "data" && (response.mimeType ?? "text/html").hasPrefix("text/")
+                if isPage {
+                    try await Telegram.sendMessage("🔗 \(url.absoluteString)", cfg: cfg)
+                    self.detail = tr("Link sent", "Ссылка отправлена", "Посилання надіслано")
+                    self.finish()
+                    return
+                }
+                let (temp, fileResponse) = try await URLSession.shared.download(from: url)
+                let name = fileResponse.suggestedFilename ?? url.lastPathComponent
+                let dir = FileManager.default.temporaryDirectory.appendingPathComponent("TeleDrop-\(UUID().uuidString)")
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                let file = dir.appendingPathComponent(name.isEmpty ? "file" : name)
+                try FileManager.default.moveItem(at: temp, to: file)
+                self.queue = [file]
+                self.next(cfg)
+            } catch {
+                log("link failed: \(error)")
+                self.fail(Telegram.friendly(error))
+            }
+        }
+    }
+
+    /// Selected text dragged onto the island goes as a message.
+    func sendText(_ text: String) {
+        log("send text (\(text.count) chars)")
+        guard let cfg = requireConfig() else { return }
+        uploading = true
+        total = 1
+        progress = 0
+        detail = String(text.prefix(40))
+        phase = .sending
+        Task { @MainActor in
+            do {
+                try await Telegram.sendMessage(String(text.prefix(4000)), cfg: cfg)
+                self.detail = tr("Text sent", "Текст отправлен", "Текст надіслано")
+                self.finish()
+            } catch {
+                self.fail(Telegram.friendly(error))
+            }
+        }
     }
 
     private func next(_ cfg: TGConfig) {
