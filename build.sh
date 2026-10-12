@@ -11,6 +11,7 @@ done
 lipo -create build/TeleDrop-arm64 build/TeleDrop-x86_64 -output $APP/Contents/MacOS/TeleDrop
 cp Info.plist $APP/Contents/
 [[ -f Resources/AppIcon.icns ]] && cp Resources/AppIcon.icns $APP/Contents/Resources/
+cp -R Resources/Sounds $APP/Contents/Resources/
 # Stable self-signed identity keeps macOS permissions across rebuilds; falls back to ad-hoc.
 ID=$(security find-identity -p codesigning | awk "/TeleDrop Dev/ {print \$2; exit}")
 codesign --force --sign "${ID:--}" $APP

@@ -185,7 +185,7 @@ struct SetupView: View {
                     .foregroundStyle(telegramBlue)
             }
             HStack {
-                SecondaryButton(title: tr("Open @BotFather", "Открыть @BotFather", "Відкрити @BotFather"), icon: "arrow.up.right") { openTelegram("BotFather") }
+                SecondaryButton(title: tr("Open @BotFather", "Открыть @BotFather", "Відкрити @BotFather"), icon: "arrow.up.right", sound: .open) { openTelegram("BotFather") }
                 Spacer()
                 PrimaryButton(title: tr("I have a token", "У меня есть токен", "У мене є токен")) { step = .token }
             }
@@ -230,7 +230,7 @@ struct SetupView: View {
                     .foregroundStyle(.tertiary)
             }
             HStack {
-                SecondaryButton(title: tr("Back", "Назад", "Назад"), icon: "chevron.left") { step = .create }
+                SecondaryButton(title: tr("Back", "Назад", "Назад"), icon: "chevron.left", sound: .back) { step = .create }
                 Spacer()
                 PrimaryButton(title: tr("Next", "Дальше", "Далі"), enabled: isValid,
                               isDefault: !(clipboardOffer && !isValid)) { step = .start }
@@ -291,9 +291,9 @@ struct SetupView: View {
                 }
             }
             HStack {
-                SecondaryButton(title: tr("Back", "Назад", "Назад"), icon: "chevron.left") { step = .token }
+                SecondaryButton(title: tr("Back", "Назад", "Назад"), icon: "chevron.left", sound: .back) { step = .token }
                 Spacer()
-                PrimaryButton(title: tr("Open", "Открыть", "Відкрити") + " @\(botUsername)", icon: "arrow.up.right") { openTelegram(botUsername) }
+                PrimaryButton(title: tr("Open", "Открыть", "Відкрити") + " @\(botUsername)", icon: "arrow.up.right", sound: .open) { openTelegram(botUsername) }
             }
         }
         .task { await waitForChat() }
@@ -318,7 +318,7 @@ struct SetupView: View {
             HStack {
                 SecondaryButton(title: tr("Show animation", "Показать анимацию", "Показати анімацію"), icon: "sparkles") { model.demo() }
                 Spacer()
-                PrimaryButton(title: tr("Start", "Начать", "Почати")) {
+                PrimaryButton(title: tr("Start", "Начать", "Почати"), sound: .valid) {
                     close()
                     step = .settings
                 }
@@ -351,8 +351,8 @@ struct SetupView: View {
                     .background(Capsule().fill(.green.opacity(0.12)))
                 }
                 HStack(spacing: 8) {
-                    SecondaryButton(title: tr("Send test", "Отправить тест", "Надіслати тест"), icon: "paperplane") { Task { await sendTest() } }
-                    SecondaryButton(title: tr("Change bot", "Сменить бота", "Змінити бота"), icon: "arrow.triangle.2.circlepath") {
+                    SecondaryButton(title: tr("Send test", "Отправить тест", "Надіслати тест"), icon: "paperplane", sound: .send) { Task { await sendTest() } }
+                    SecondaryButton(title: tr("Change bot", "Сменить бота", "Змінити бота"), icon: "arrow.triangle.2.circlepath", sound: .back) {
                         token = ""
                         tokenState = .empty
                         foundChat = nil
@@ -381,6 +381,7 @@ struct SetupView: View {
                     }
                 Text("·")
                 Button(tr("Log", "Журнал", "Журнал")) {
+                    Sfx.tap.play()
                     NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/Library/Logs/TeleDrop.log"))
                 }
                 .buttonStyle(.plain)
@@ -439,6 +440,7 @@ struct SetupView: View {
                                "У буфері немає токена — скопіюй його в BotFather (натисни на токен)")
             return
         }
+        Sfx.paste.play()
         clipboardNote = nil
         clipboardOffer = false
         autoAdvance = true
@@ -459,6 +461,7 @@ struct SetupView: View {
             let bot = try await Telegram.getMe(candidate)
             guard !Task.isCancelled else { return }
             tokenState = .valid(bot.username)
+            Sfx.valid.play(volume: 0.4)
             if autoAdvance {
                 autoAdvance = false
                 try? await Task.sleep(for: .milliseconds(800))
@@ -467,6 +470,7 @@ struct SetupView: View {
         } catch {
             guard !Task.isCancelled else { return }
             tokenState = .invalid(Telegram.friendly(error))
+            Sfx.invalid.play(volume: 0.4)
         }
     }
 
@@ -480,6 +484,7 @@ struct SetupView: View {
                 Settings.botName = botUsername
                 model.botName = botUsername
                 foundChat = chat
+                Sfx.found.play()
                 log("bot @\(botUsername) connected")
                 if let cfg = TGConfig.load() {
                     try? await Telegram.sendMessage(
@@ -586,7 +591,7 @@ struct SettingToggle: View {
             Text(title).font(.system(size: 13))
             Spacer()
             Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).tint(telegramBlue).controlSize(.small)
-                .onChange(of: isOn) { _, _ in UISound.click() }
+                .onChange(of: isOn) { _, _ in Sfx.toggle.play(volume: 0.4) }
         }
     }
 }
@@ -641,11 +646,12 @@ struct PrimaryButton: View {
     var icon: String?
     var enabled = true
     var isDefault = true
+    var sound: Sfx = .next
     var action: () -> Void
     @State private var hovering = false
 
     var body: some View {
-        Button(action: action) {
+        Button(action: { sound.play(); action() }) {
             HStack(spacing: 6) {
                 Text(title)
                 if let icon { Image(systemName: icon).font(.system(size: 11, weight: .bold)) }
@@ -667,11 +673,12 @@ struct PrimaryButton: View {
 struct SecondaryButton: View {
     var title: String
     var icon: String?
+    var sound: Sfx = .tap
     var action: () -> Void
     @State private var hovering = false
 
     var body: some View {
-        Button(action: action) {
+        Button(action: { sound.play(); action() }) {
             HStack(spacing: 6) {
                 if let icon { Image(systemName: icon).font(.system(size: 11, weight: .semibold)) }
                 Text(title)
@@ -690,7 +697,6 @@ struct SecondaryButton: View {
 struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .onChange(of: configuration.isPressed) { _, pressed in if pressed { UISound.click() } }
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }

@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 
 /// The UI is English. Ukrainian and Russian are tucked away: ⌘L anywhere in the app,
 /// the 🌐 badge that appears while ⌥ is held, or ⌥ in the menu bar menu. Order: EN → UK → RU.
@@ -36,18 +36,6 @@ func partsCount(_ n: Int) -> String {
 }
 
 /// Russian and Ukrainian share the plural rules: 1 / 2–4 / 5+ (11–14 are "many").
-/// Soft click for buttons and toggles in the app (respects the Sounds setting).
-enum UISound {
-    static func click() { play("Tink", volume: 0.18) }
-    static func language() { play("Pop", volume: 0.3) }
-
-    private static func play(_ name: String, volume: Float) {
-        guard Settings.soundsOn, let sound = NSSound(named: name)?.copy() as? NSSound else { return }
-        sound.volume = volume
-        sound.play()
-    }
-}
-
 private func slavicCount(_ n: Int, _ one: String, _ few: String, _ many: String) -> String {
     let m10 = n % 10, m100 = n % 100
     let word = m10 == 1 && m100 != 11 ? one : (2...4).contains(m10) && !(12...14).contains(m100) ? few : many

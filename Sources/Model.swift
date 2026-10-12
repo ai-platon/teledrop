@@ -10,6 +10,7 @@ final class DropModel: ObservableObject {
         didSet {
             guard phase != oldValue else { return }
             log("phase \(oldValue) → \(phase)")
+            playSound(from: oldValue, to: phase)
             onPhaseChange?(phase)
         }
     }
@@ -93,7 +94,6 @@ final class DropModel: ObservableObject {
         queue = urls
         total = urls.count
         uploading = true
-        play("Pop", volume: 0.5)
         next(cfg)
     }
 
@@ -135,7 +135,6 @@ final class DropModel: ObservableObject {
         let bot = botName.map { " → @\($0)" } ?? ""
         detail = total == 1 ? detail : filesCount(total) + bot
         phase = .done
-        play("Glass", volume: 0.25)
         scheduleHide(after: 1.8)
     }
 
@@ -144,7 +143,6 @@ final class DropModel: ObservableObject {
         queue = []
         detail = message
         phase = .error
-        play("Funk", volume: 0.3)
         scheduleHide(after: 4)
     }
 
@@ -178,7 +176,7 @@ final class DropModel: ObservableObject {
     /// Plays the whole animation without sending anything.
     func cycleLanguage() {
         Settings.language = Settings.language.next
-        UISound.language()
+        Sfx.language.play()
         withAnimation(.easeInOut(duration: 0.35)) { language = Settings.language }
     }
 
@@ -191,7 +189,6 @@ final class DropModel: ObservableObject {
         phase = .peek
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.setHover(true) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-            self.play("Pop", volume: 0.5)
             self.detail = tr("vacation-2026.jpg", "отпуск-2026.jpg", "відпустка-2026.jpg")
             self.progress = 0
             self.phase = .sending
@@ -206,9 +203,16 @@ final class DropModel: ObservableObject {
         }
     }
 
-    private func play(_ name: String, volume: Float) {
-        guard Settings.soundsOn, let sound = NSSound(named: name)?.copy() as? NSSound else { return }
-        sound.volume = volume
-        sound.play()
+    /// Every island state change has its own sound, so it can be followed by ear.
+    private func playSound(from old: Phase, to new: Phase) {
+        switch (old, new) {
+        case (.hidden, .peek), (.done, .peek), (.error, .peek): Sfx.peek.play(volume: 0.3)
+        case (.peek, .hover): Sfx.hover.play(volume: 0.35)
+        case (.hover, .sending), (.hidden, .sending): Sfx.drop.play()
+        case (.sending, .done): Sfx.sent.play(volume: 0.4)
+        case (_, .error): Sfx.error.play(volume: 0.4)
+        case (.peek, .hidden), (.hover, .hidden): Sfx.close.play(volume: 0.25)
+        default: break
+        }
     }
 }

@@ -176,10 +176,14 @@ struct IslandView: View {
         .padding(Self.shadowRoom)
         .drawingGroup()
         .padding(-Self.shadowRoom)
+        // Appears by springing out of the notch: squeezed against the top edge, then overshoots a bit.
+        .scaleEffect(m.phase == .hidden ? CGSize(width: 0.5, height: 0.2) : CGSize(width: 1, height: 1), anchor: .top)
+        .blur(radius: m.phase == .hidden ? 6 : 0)
         .opacity(m.phase == .hidden ? 0 : 1)
         .padding(.leading, m.centered ? 0 : Self.leadingInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: m.centered ? .top : .topLeading)
-        .animation(.spring(response: 0.42, dampingFraction: 0.72), value: m.phase)
+        .animation(m.phase == .peek ? .spring(response: 0.48, dampingFraction: 0.58)
+                                    : .spring(response: 0.42, dampingFraction: 0.72), value: m.phase)
         .animation(.easeInOut(duration: 0.3), value: m.language)
     }
 
