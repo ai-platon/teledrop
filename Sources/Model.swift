@@ -14,6 +14,11 @@ final class DropModel: ObservableObject {
             onPhaseChange?(phase)
         }
     }
+    enum Stage { case reading, uploading }
+    @Published var stage: Stage = .uploading
+    /// The file being read lives in iCloud (Desktop/Documents sync) and is downloaded first.
+    @Published var fromCloud = false
+    @Published var readProgress: Double = 0
     @Published var progress: Double = 0 {
         didSet { if phase == .sending { EngineSound.shared.set(progress: progress) } }
     }
@@ -63,6 +68,7 @@ final class DropModel: ObservableObject {
     /// Called synchronously from the drop so the island never collapses between drop and send.
     func beginDrop() {
         hideWork?.cancel()
+        stage = .uploading
         suppressPeekUntil = Date().addingTimeInterval(1.5)
         guard !uploading else { return }
         if phase != .sending { progress = 0 }
@@ -185,8 +191,20 @@ final class DropModel: ObservableObject {
                     await MainActor.run {
                         self?.detail = count > 1 ? "\(label) · " + tr("part \(i + 1) of \(count)", "часть \(i + 1) из \(count)", "частина \(i + 1) з \(count)") : label
                     }
-                    try await Telegram.sendDocument(part, caption: i == 0 ? prepared.caption : nil, cfg: cfg) { fraction in
-                        DispatchQueue.main.async { self?.progress = (Double(i) + fraction) / Double(count) }
+                    let cloud = (try? part.resourceValues(forKeys: [.isUbiquitousItemKey]).isUbiquitousItem) == true
+                    await MainActor.run {
+                        self?.fromCloud = cloud
+                        self?.readProgress = 0
+                        self?.stage = .reading
+                    }
+                    try await Telegram.sendDocument(part, caption: i == 0 ? prepared.caption : nil, cfg: cfg,
+                                                    reading: { fraction in
+                        DispatchQueue.main.async { self?.readProgress = fraction }
+                    }) { fraction in
+                        DispatchQueue.main.async {
+                            self?.stage = .uploading
+                            self?.progress = (Double(i) + fraction) / Double(count)
+                        }
                     }
                 }
                 log("uploaded \(file.lastPathComponent) in \(count) part(s)")

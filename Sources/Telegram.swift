@@ -47,10 +47,13 @@ enum Telegram {
     }
 
     /// Uploads one file as a document, retrying when Telegram asks to slow down.
+    /// `reading` reports how much of the file has been read (slow when it has to come down from iCloud),
+    /// `progress` how much has been uploaded.
     static func sendDocument(_ file: URL, caption: String?, cfg: TGConfig,
+                             reading: @escaping (Double) -> Void = { _ in },
                              progress: @escaping (Double) -> Void) async throws {
         let boundary = "TeleDrop-\(UUID().uuidString)"
-        let body = try writeBody(file, caption: caption, chatID: cfg.chatID, boundary: boundary)
+        let body = try writeBody(file, caption: caption, chatID: cfg.chatID, boundary: boundary, reading: reading)
         defer { try? FileManager.default.removeItem(at: body) }
 
         var request = URLRequest(url: URL(string: "https://api.telegram.org/bot\(cfg.token)/sendDocument")!)
@@ -103,7 +106,8 @@ enum Telegram {
         return result
     }
 
-    private static func writeBody(_ file: URL, caption: String?, chatID: String, boundary: String) throws -> URL {
+    private static func writeBody(_ file: URL, caption: String?, chatID: String, boundary: String,
+                                  reading: (Double) -> Void) throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(boundary)
         FileManager.default.createFile(atPath: url.path, contents: nil)
         let out = try FileHandle(forWritingTo: url)
@@ -119,7 +123,13 @@ enum Telegram {
         out.write(Data("Content-Type: application/octet-stream\r\n\r\n".utf8))
         let input = try FileHandle(forReadingFrom: file)
         defer { try? input.close() }
-        while let chunk = try input.read(upToCount: 1 << 20), !chunk.isEmpty { out.write(chunk) }
+        let total = Double(max(1, Packer.size(of: file)))
+        var done = 0.0
+        while let chunk = try input.read(upToCount: 1 << 20), !chunk.isEmpty {
+            out.write(chunk)
+            done += Double(chunk.count)
+            reading(done / total)
+        }
         out.write(Data("\r\n--\(boundary)--\r\n".utf8))
         return url
     }

@@ -119,10 +119,20 @@ struct IslandView: View {
         switch m.phase {
         case .hidden, .peek: tr("To Telegram", "В Telegram", "У Telegram")
         case .hover: tr("Let go — I'll send it", "Отпусти — отправлю", "Відпусти — надішлю")
-        case .sending: m.progress < 0.01 ? tr("Preparing…", "Готовлю файл…", "Готую файл…") : tr("Sending… ", "Отправляю… ", "Надсилаю… ") + "\(Int(m.progress * 100))%"
+        case .sending: sendingTitle
         case .done: tr("Sent", "Отправлено", "Надіслано")
         case .error: tr("Didn't work", "Не получилось", "Не вийшло")
         }
+    }
+
+    private var sendingTitle: String {
+        if m.stage == .reading, m.readProgress > 0 {
+            let what = m.fromCloud ? tr("From iCloud… ", "Из iCloud… ", "З iCloud… ") : tr("Reading… ", "Читаю… ", "Читаю… ")
+            return what + "\(Int(m.readProgress * 100))%"
+        }
+        if m.progress < 0.01 { return tr("Preparing…", "Готовлю файл…", "Готую файл…") }
+        if m.progress >= 0.999 { return tr("Finishing…", "Завершаю…", "Завершую…") }
+        return tr("Sending… ", "Отправляю… ", "Надсилаю… ") + "\(Int(m.progress * 100))%"
     }
 
     private var subtitle: String {
@@ -205,7 +215,7 @@ struct IslandView: View {
                     .truncationMode(.middle)
                     .fixedSize(horizontal: false, vertical: m.phase == .error)
                 if m.phase == .sending {
-                    ProgressBar(value: m.progress)
+                    ProgressBar(value: m.stage == .reading ? m.readProgress : m.progress)
                         .padding(.top, 5)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
@@ -264,11 +274,10 @@ final class DropView: NSView {
 
     /// Browsers often drag a link instead of a file; images and text can come without a file too.
     private func acceptNonFile(_ pasteboard: NSPasteboard) -> Bool {
-        if let link = webLink(in: pasteboard) {
-            model.sendLink(link)
-            return true
-        }
-        if let image = (pasteboard.readObjects(forClasses: [NSImage.self]) as? [NSImage])?.first,
+        // A picture wins over the link around it (Chrome puts both on the pasteboard).
+        let imageTypes: Set<String> = ["public.tiff", "public.png", "public.jpeg", "com.compuserve.gif", "public.heic"]
+        if pasteboard.types?.contains(where: { imageTypes.contains($0.rawValue) }) == true,
+           let image = (pasteboard.readObjects(forClasses: [NSImage.self]) as? [NSImage])?.first,
            let tiff = image.tiffRepresentation,
            let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
             let file = FileManager.default.temporaryDirectory.appendingPathComponent("Image \(Int(Date().timeIntervalSince1970)).png")
@@ -276,6 +285,10 @@ final class DropView: NSView {
                 model.send([file])
                 return true
             }
+        }
+        if let link = webLink(in: pasteboard) {
+            model.sendLink(link)
+            return true
         }
         if let text = pasteboard.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             model.sendText(text)
@@ -295,7 +308,7 @@ final class DropView: NSView {
         guard overIsland(info) else { return false }
         performed = true
         let pasteboard = info.draggingPasteboard
-        log("drop types: \(pasteboard.types?.map(\.rawValue).prefix(6) ?? [])")
+        log("drop types: \(pasteboard.types?.map(\.rawValue) ?? [])")
         model.beginDrop()
 
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self],
