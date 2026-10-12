@@ -223,7 +223,7 @@ final class DropModel: ObservableObject {
         case (.hidden, .peek), (.done, .peek), (.error, .peek):
             // Halloween: a long ghost wail underneath, quieter than every other island sound,
             // so the hover/drop sounds play clearly on top of it.
-            Theme.isHalloween ? Sfx.boolong.play(volume: 0.14) : Sfx.peek.play(volume: 0.3)
+            Theme.isHalloween ? Sfx.boolong.play(volume: 0.115) : Sfx.peek.play(volume: 0.3)
         case (.peek, .hover): Sfx.hover.play(volume: 0.35)
         case (.hover, .sending), (.hidden, .sending): Sfx.drop.play()
         case (.sending, .done): (Theme.isHalloween ? Sfx.spooky : Sfx.sent).play(volume: 0.4)

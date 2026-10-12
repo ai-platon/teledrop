@@ -97,8 +97,31 @@ def vibrato(f0, f1, dur, rate=6.0, depth=0.03, amp=0.4, attack=0.06, decay=None)
 
 # Halloween
 save("boo",    mix((0, vibrato(330, 520, 0.45, amp=0.45)), (0.05, noise(0.35, 0.06, 0.15, seed=9))))
-# Twice as long, for switching the theme on: a slower, deeper ghost wail.
-save("boolong", mix((0, vibrato(300, 540, 0.9, rate=4.5, depth=0.04, amp=0.45, attack=0.12, decay=0.6)),
-                    (0.1, noise(0.7, 0.06, 0.3, seed=9))))
+# The long ghost wail (theme switch, island opening): swells in, holds, then a long fade from loud to silent.
+def ghost(dur, f0, f1, fade, amp=0.45, attack=0.25, rate=4.5, depth=0.04):
+    n = int(RATE * dur)
+    out, phase = [], 0.0
+    for i in range(n):
+        t = i / RATE
+        f = f0 * (f1 / f0) ** min(1.0, t / (dur - fade)) * (1 + depth * math.sin(2 * math.pi * rate * t))
+        phase += 2 * math.pi * f / RATE
+        rise = min(1.0, t / attack)
+        left = dur - t
+        fall = 1.0 if left > fade else 0.5 - 0.5 * math.cos(math.pi * left / fade)  # smooth high → low
+        out.append(amp * rise * fall * (math.sin(phase) + 0.25 * math.sin(2 * phase)))
+    return out
+
+
+def faded_noise(dur, amp, fade, seed):
+    out = noise(dur, amp, decay=dur * 10, seed=seed)  # flat, then shaped like the wail
+    for i in range(len(out)):
+        left = dur - i / RATE
+        if left < fade:
+            out[i] *= 0.5 - 0.5 * math.cos(math.pi * left / fade)
+        out[i] *= min(1.0, i / (RATE * 0.25))
+    return out
+
+
+save("boolong", mix((0, ghost(1.8, 300, 540, fade=1.0)), (0.1, faded_noise(1.7, 0.05, 1.0, seed=9))))
 save("spooky", mix(*[(i * 0.11, bell(f, 0.5, 0.3)) for i, f in enumerate((784, 932, 1109, 1568))]))
 print("halloween sounds ok")
