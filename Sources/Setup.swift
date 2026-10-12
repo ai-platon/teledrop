@@ -60,6 +60,8 @@ struct SetupView: View {
     @State private var clipboardSeen = NSPasteboard.general.changeCount
     @State private var clipboardNote: String?
     @State private var autoAdvance = false
+    @State private var optionHeld = false
+    @State private var flagsMonitor: Any?
 
     private var botUsername: String {
         if case .valid(let name) = tokenState { return name }
@@ -93,6 +95,21 @@ struct SetupView: View {
             .padding(.horizontal, 28)
             .padding(.top, 38)
             .padding(.bottom, 24)
+            // Changing language blurs the old text out and the new text in.
+            .id(model.language)
+            .transition(.blurReplace)
+        }
+        .overlay(alignment: .topTrailing) { languageBadge }
+        .animation(.easeOut(duration: 0.15), value: optionHeld)
+        .onAppear {
+            flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                optionHeld = event.modifierFlags.contains(.option)
+                return event
+            }
+        }
+        .onDisappear {
+            flagsMonitor.map(NSEvent.removeMonitor)
+            flagsMonitor = nil
         }
         .frame(width: 480, height: 560)
         .preferredColorScheme(.dark)
@@ -107,6 +124,16 @@ struct SetupView: View {
     }
 
     // MARK: Header
+
+    /// Hidden language switch in the window corner (EN → RU → UK): only there while ⌥ is held.
+    @ViewBuilder private var languageBadge: some View {
+        if optionHeld {
+            LanguageBadge(code: model.language.rawValue.uppercased()) { model.cycleLanguage() }
+                .padding(.top, 12)
+                .padding(.trailing, 14)
+                .transition(.opacity)
+        }
+    }
 
     private var mood: Mood {
         switch step {
@@ -136,7 +163,7 @@ struct SetupView: View {
             .frame(height: 70)
             Text("TeleDrop")
                 .font(.system(size: 22, weight: .bold))
-            Text(tr("Drop files on the notch — get them in Telegram", "Бросай файлы в вырез — получай в Telegram"))
+            Text(tr("Drop files on the notch — get them in Telegram", "Бросай файлы в вырез — получай в Telegram", "Кидай файли у виріз — отримуй у Telegram"))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
@@ -147,20 +174,20 @@ struct SetupView: View {
     private var createStep: some View {
         VStack(spacing: 16) {
             Card {
-                CardTitle(number: 1, text: tr("Create your bot", "Создай своего бота"))
-                Instruction(n: 1, text: LocalizedStringKey(tr("Open **@BotFather** in Telegram", "Открой **@BotFather** в Telegram")))
-                Instruction(n: 2, text: LocalizedStringKey(tr("Send the **/newbot** command", "Отправь команду **/newbot**")))
-                Instruction(n: 3, text: LocalizedStringKey(tr("Pick a name and a username — it must end in **bot**", "Придумай имя и юзернейм — он должен заканчиваться на **bot**")))
-                Instruction(n: 4, text: LocalizedStringKey(tr("BotFather replies with a **token** — copy it", "BotFather пришлёт **токен** — скопируй его")))
-                Label(tr("Then just come back here — I'll pick the token up", "Потом просто вернись сюда — я подхвачу токен"),
+                CardTitle(number: 1, text: tr("Create your bot", "Создай своего бота", "Створи свого бота"))
+                Instruction(n: 1, text: LocalizedStringKey(tr("Open **@BotFather** in Telegram", "Открой **@BotFather** в Telegram", "Відкрий **@BotFather** у Telegram")))
+                Instruction(n: 2, text: LocalizedStringKey(tr("Send the **/newbot** command", "Отправь команду **/newbot**", "Надішли команду **/newbot**")))
+                Instruction(n: 3, text: LocalizedStringKey(tr("Pick a name and a username — it must end in **bot**", "Придумай имя и юзернейм — он должен заканчиваться на **bot**", "Придумай ім’я та юзернейм — він має закінчуватися на **bot**")))
+                Instruction(n: 4, text: LocalizedStringKey(tr("BotFather replies with a **token** — copy it", "BotFather пришлёт **токен** — скопируй его", "BotFather надішле **токен** — скопіюй його")))
+                Label(tr("Then just come back here — I'll pick the token up", "Потом просто вернись сюда — я подхвачу токен", "Потім просто повернися сюди — я підхоплю токен"),
                       systemImage: "sparkles")
                     .font(.system(size: 12))
                     .foregroundStyle(telegramBlue)
             }
             HStack {
-                SecondaryButton(title: tr("Open @BotFather", "Открыть @BotFather"), icon: "arrow.up.right") { openTelegram("BotFather") }
+                SecondaryButton(title: tr("Open @BotFather", "Открыть @BotFather", "Відкрити @BotFather"), icon: "arrow.up.right") { openTelegram("BotFather") }
                 Spacer()
-                PrimaryButton(title: tr("I have a token", "У меня есть токен")) { step = .token }
+                PrimaryButton(title: tr("I have a token", "У меня есть токен", "У мене є токен")) { step = .token }
             }
         }
     }
@@ -168,7 +195,7 @@ struct SetupView: View {
     private var tokenStep: some View {
         VStack(spacing: 16) {
             Card {
-                CardTitle(number: 2, text: tr("Paste the bot token", "Вставь токен бота"))
+                CardTitle(number: 2, text: tr("Paste the bot token", "Вставь токен бота", "Встав токен бота"))
                 if clipboardOffer && !isValid {
                     clipboardBanner
                 }
@@ -186,10 +213,6 @@ struct SetupView: View {
                         Image(systemName: revealToken ? "eye.slash" : "eye").foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    Button(tr("Paste", "Вставить")) { pasteFromClipboard() }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(telegramBlue)
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 38)
@@ -202,14 +225,14 @@ struct SetupView: View {
                 } else {
                     tokenStatus
                 }
-                Text(tr("The token stays on this Mac and is only ever sent to Telegram.", "Токен хранится только на этом Mac и уходит только в Telegram."))
+                Text(tr("The token stays on this Mac and is only ever sent to Telegram.", "Токен хранится только на этом Mac и уходит только в Telegram.", "Токен зберігається лише на цьому Mac і надсилається лише в Telegram."))
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
             HStack {
-                SecondaryButton(title: tr("Back", "Назад"), icon: "chevron.left") { step = .create }
+                SecondaryButton(title: tr("Back", "Назад", "Назад"), icon: "chevron.left") { step = .create }
                 Spacer()
-                PrimaryButton(title: tr("Next", "Дальше"), enabled: isValid,
+                PrimaryButton(title: tr("Next", "Дальше", "Далі"), enabled: isValid,
                               isDefault: !(clipboardOffer && !isValid)) { step = .start }
             }
         }
@@ -236,12 +259,12 @@ struct SetupView: View {
     @ViewBuilder private var tokenStatus: some View {
         switch tokenState {
         case .empty:
-            Text(tr("Looks like: 123456789:AAH-xYz…", "Выглядит так: 123456789:AAH-xYz…")).font(.system(size: 12)).foregroundStyle(.secondary)
+            Text(tr("Looks like: 123456789:AAH-xYz…", "Выглядит так: 123456789:AAH-xYz…", "Виглядає так: 123456789:AAH-xYz…")).font(.system(size: 12)).foregroundStyle(.secondary)
         case .checking:
-            HStack(spacing: 6) { ProgressView().controlSize(.small); Text(tr("Checking…", "Проверяю…")) }
+            HStack(spacing: 6) { ProgressView().controlSize(.small); Text(tr("Checking…", "Проверяю…", "Перевіряю…")) }
                 .font(.system(size: 12)).foregroundStyle(.secondary)
         case .valid(let name):
-            Label(LocalizedStringKey(tr("Found bot **@\(name)**", "Бот **@\(name)** найден")), systemImage: "checkmark.circle.fill")
+            Label(LocalizedStringKey(tr("Found bot **@\(name)**", "Бот **@\(name)** найден", "Бота **@\(name)** знайдено")), systemImage: "checkmark.circle.fill")
                 .font(.system(size: 12)).foregroundStyle(.green)
         case .invalid(let message):
             Label(message, systemImage: "exclamationmark.circle.fill")
@@ -252,25 +275,25 @@ struct SetupView: View {
     private var startStep: some View {
         VStack(spacing: 16) {
             Card {
-                CardTitle(number: 3, text: tr("Press Start in your bot", "Нажми Start у бота"))
-                Text(LocalizedStringKey(tr("Open **@\(botUsername)** and press **Start** — I'll find your chat and say hi.", "Открой **@\(botUsername)** и нажми **Start** — я сам найду твой чат и пришлю приветствие.")))
+                CardTitle(number: 3, text: tr("Press Start in your bot", "Нажми Start у бота", "Натисни Start у бота"))
+                Text(LocalizedStringKey(tr("Open **@\(botUsername)** and press **Start** — I'll find your chat and say hi.", "Открой **@\(botUsername)** и нажми **Start** — я сам найду твой чат и пришлю приветствие.", "Відкрий **@\(botUsername)** і натисни **Start** — я сам знайду твій чат і надішлю привітання.")))
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let foundChat {
-                    Label(tr("Found you", "Нашёл тебя") + (foundChat.name.isEmpty ? "" : ", \(foundChat.name)") + "!", systemImage: "checkmark.circle.fill")
+                    Label(tr("Found you", "Нашёл тебя", "Знайшов тебе") + (foundChat.name.isEmpty ? "" : ", \(foundChat.name)") + "!", systemImage: "checkmark.circle.fill")
                         .font(.system(size: 13, weight: .medium)).foregroundStyle(.green)
                 } else {
                     HStack(spacing: 8) {
                         WaitingDots()
-                        Text(tr("Waiting for your message to the bot…", "Жду твоё сообщение боту…")).font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text(tr("Waiting for your message to the bot…", "Жду твоё сообщение боту…", "Чекаю на твоє повідомлення боту…")).font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                 }
             }
             HStack {
-                SecondaryButton(title: tr("Back", "Назад"), icon: "chevron.left") { step = .token }
+                SecondaryButton(title: tr("Back", "Назад", "Назад"), icon: "chevron.left") { step = .token }
                 Spacer()
-                PrimaryButton(title: tr("Open", "Открыть") + " @\(botUsername)", icon: "arrow.up.right") { openTelegram(botUsername) }
+                PrimaryButton(title: tr("Open", "Открыть", "Відкрити") + " @\(botUsername)", icon: "arrow.up.right") { openTelegram(botUsername) }
             }
         }
         .task { await waitForChat() }
@@ -279,23 +302,23 @@ struct SetupView: View {
     private var doneStep: some View {
         VStack(spacing: 16) {
             Card {
-                Text(tr("All set! 🎉", "Готово! 🎉")).font(.system(size: 17, weight: .semibold))
-                Text(LocalizedStringKey(tr("Drag any file to the notch — it lands in Telegram via **@\(botUsername)**.", "Перетащи любой файл к вырезу — он прилетит в Telegram к **@\(botUsername)**.")))
+                Text(tr("All set! 🎉", "Готово! 🎉", "Готово! 🎉")).font(.system(size: 17, weight: .semibold))
+                Text(LocalizedStringKey(tr("Drag any file to the notch — it lands in Telegram via **@\(botUsername)**.", "Перетащи любой файл к вырезу — он прилетит в Telegram к **@\(botUsername)**.", "Перетягни будь-який файл до вирізу — він прилетить у Telegram до **@\(botUsername)**.")))
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
-                    Tip(icon: "doc.on.doc", text: tr("Files & folders", "Файлы и папки"))
-                    Tip(icon: "photo", text: tr("Photos & screenshots", "Фото и скриншоты"))
-                    Tip(icon: "archivebox", text: tr("Over 49 MB — zipped", "Больше 49 МБ — zip"))
+                    Tip(icon: "doc.on.doc", text: tr("Files & folders", "Файлы и папки", "Файли й папки"))
+                    Tip(icon: "photo", text: tr("Photos & screenshots", "Фото и скриншоты", "Фото й скриншоти"))
+                    Tip(icon: "archivebox", text: tr("Over 49 MB — zipped", "Больше 49 МБ — zip", "Понад 49 МБ — zip"))
                 }
-                SettingToggle(title: tr("Open at login", "Запускать при входе в систему"), isOn: $launchAtLogin)
+                SettingToggle(title: tr("Open at login", "Запускать при входе в систему", "Запускати під час входу в систему"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
             }
             HStack {
-                SecondaryButton(title: tr("Show animation", "Показать анимацию"), icon: "sparkles") { model.demo() }
+                SecondaryButton(title: tr("Show animation", "Показать анимацию", "Показати анімацію"), icon: "sparkles") { model.demo() }
                 Spacer()
-                PrimaryButton(title: tr("Start", "Начать")) {
+                PrimaryButton(title: tr("Start", "Начать", "Почати")) {
                     close()
                     step = .settings
                 }
@@ -316,20 +339,20 @@ struct SetupView: View {
                         .overlay(Image(systemName: "paperplane.fill").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("@\(botUsername)").font(.system(size: 14, weight: .semibold))
-                        Text(Settings.chatName.map { tr("Sends to: ", "Отправляет: ") + $0 } ?? tr("Sends to your chat", "Отправляет в твой чат"))
+                        Text(Settings.chatName.map { tr("Sends to: ", "Отправляет: ", "Надсилає: ") + $0 } ?? tr("Sends to your chat", "Отправляет в твой чат", "Надсилає у твій чат"))
                             .font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                     Spacer()
                     HStack(spacing: 5) {
                         Circle().fill(.green).frame(width: 7, height: 7)
-                        Text(tr("Connected", "Подключён")).font(.system(size: 11, weight: .medium)).foregroundStyle(.green)
+                        Text(tr("Connected", "Подключён", "Підключено")).font(.system(size: 11, weight: .medium)).foregroundStyle(.green)
                     }
                     .padding(.horizontal, 9).padding(.vertical, 4)
                     .background(Capsule().fill(.green.opacity(0.12)))
                 }
                 HStack(spacing: 8) {
-                    SecondaryButton(title: tr("Send test", "Отправить тест"), icon: "paperplane") { Task { await sendTest() } }
-                    SecondaryButton(title: tr("Change bot", "Сменить бота"), icon: "arrow.triangle.2.circlepath") {
+                    SecondaryButton(title: tr("Send test", "Отправить тест", "Надіслати тест"), icon: "paperplane") { Task { await sendTest() } }
+                    SecondaryButton(title: tr("Change bot", "Сменить бота", "Змінити бота"), icon: "arrow.triangle.2.circlepath") {
                         token = ""
                         tokenState = .empty
                         foundChat = nil
@@ -341,29 +364,29 @@ struct SetupView: View {
                 }
             }
             Card {
-                SettingToggle(title: tr("Open at login", "Запускать при входе в систему"), isOn: $launchAtLogin)
+                SettingToggle(title: tr("Open at login", "Запускать при входе в систему", "Запускати під час входу в систему"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
-                SettingToggle(title: tr("Sounds", "Звуки"), isOn: $sounds)
+                SettingToggle(title: tr("Sounds", "Звуки", "Звуки"), isOn: $sounds)
                     .onChange(of: sounds) { _, on in Settings.soundsOn = on }
                 if CoucouWatcher.isInstalled {
-                    SettingToggle(title: tr("Make room for expanded Coucou", "Уступать место раскрытому Coucou"), isOn: $avoidCoucou)
+                    SettingToggle(title: tr("Make room for expanded Coucou", "Уступать место раскрытому Coucou", "Ставати поруч із Coucou"), isOn: $avoidCoucou)
                         .onChange(of: avoidCoucou) { _, on in Settings.avoidCoucou = on }
                 }
             }
             HStack {
-                Text(tr("Version ", "Версия ") + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"))
+                Text(tr("Version ", "Версия ", "Версія ") + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"))
                     // Hidden language switch: ⌥-click the version.
                     .onTapGesture {
-                        if NSEvent.modifierFlags.contains(.option) { model.toggleLanguage() }
+                        if NSEvent.modifierFlags.contains(.option) { model.cycleLanguage() }
                     }
                 Text("·")
-                Button(tr("Log", "Журнал")) {
+                Button(tr("Log", "Журнал", "Журнал")) {
                     NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/Library/Logs/TeleDrop.log"))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(telegramBlue)
                 Spacer()
-                SecondaryButton(title: tr("Show animation", "Показать анимацию"), icon: "sparkles") { model.demo() }
+                SecondaryButton(title: tr("Show animation", "Показать анимацию", "Показати анімацію"), icon: "sparkles") { model.demo() }
             }
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
@@ -377,9 +400,9 @@ struct SetupView: View {
             HStack(spacing: 12) {
                 Image(systemName: "doc.on.clipboard.fill").font(.system(size: 16))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(tr("Paste token from clipboard", "Вставить токен из буфера"))
+                    Text(tr("Paste token from clipboard", "Вставить токен из буфера", "Вставити токен із буфера"))
                         .font(.system(size: 13, weight: .semibold))
-                    Text(tr("Copied it in BotFather? Just one click.", "Скопировал в BotFather? Всего один клик."))
+                    Text(tr("Copied it in BotFather? Just one click.", "Скопировал в BotFather? Всего один клик.", "Скопіював у BotFather? Лише один клік."))
                         .font(.system(size: 11)).opacity(0.8)
                 }
                 Spacer()
@@ -412,7 +435,8 @@ struct SetupView: View {
         let text = NSPasteboard.general.string(forType: .string) ?? ""
         guard let found = Telegram.extractToken(text) else {
             clipboardNote = tr("No token in the clipboard — copy it in BotFather (tap the token to copy)",
-                               "В буфере нет токена — скопируй его в BotFather (нажми на токен)")
+                               "В буфере нет токена — скопируй его в BotFather (нажми на токен)",
+                               "У буфері немає токена — скопіюй його в BotFather (натисни на токен)")
             return
         }
         clipboardNote = nil
@@ -425,7 +449,7 @@ struct SetupView: View {
         let candidate = Telegram.extractToken(token) ?? token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !candidate.isEmpty else { tokenState = .empty; return }
         guard Telegram.isTokenShaped(candidate) else {
-            tokenState = .invalid(tr("Doesn't look like a token — copy the whole thing from BotFather", "Не похоже на токен — скопируй его из BotFather целиком"))
+            tokenState = .invalid(tr("Doesn't look like a token — copy the whole thing from BotFather", "Не похоже на токен — скопируй его из BotFather целиком", "Не схоже на токен — скопіюй його з BotFather повністю"))
             return
         }
         tokenState = .checking
@@ -459,7 +483,7 @@ struct SetupView: View {
                 log("bot @\(botUsername) connected")
                 if let cfg = TGConfig.load() {
                     try? await Telegram.sendMessage(
-                        tr("👋 TeleDrop is connected!\nDrag any file to the notch on your Mac — it will show up here.", "👋 TeleDrop подключён!\nПеретащи любой файл к вырезу на Mac — он придёт сюда."), cfg: cfg)
+                        tr("👋 TeleDrop is connected!\nDrag any file to the notch on your Mac — it will show up here.", "👋 TeleDrop подключён!\nПеретащи любой файл к вырезу на Mac — он придёт сюда.", "👋 TeleDrop підключено!\nПеретягни будь-який файл до вирізу на Mac — він прийде сюди."), cfg: cfg)
                 }
                 try? await Task.sleep(for: .milliseconds(900))
                 step = .done
@@ -471,12 +495,12 @@ struct SetupView: View {
 
     private func sendTest() async {
         guard let cfg = TGConfig.load() else { return }
-        testStatus = tr("Sending…", "Отправляю…")
+        testStatus = tr("Sending…", "Отправляю…", "Надсилаю…")
         do {
-            try await Telegram.sendMessage(tr("✅ Connection check: TeleDrop is here.", "✅ Проверка связи: TeleDrop на месте."), cfg: cfg)
-            testStatus = tr("Sent — check Telegram", "Сообщение отправлено — проверь Telegram")
+            try await Telegram.sendMessage(tr("✅ Connection check: TeleDrop is here.", "✅ Проверка связи: TeleDrop на месте.", "✅ Перевірка зв’язку: TeleDrop на місці."), cfg: cfg)
+            testStatus = tr("Sent — check Telegram", "Сообщение отправлено — проверь Telegram", "Повідомлення надіслано — перевір Telegram")
         } catch {
-            testStatus = tr("Didn't work: ", "Не получилось: ") + Telegram.friendly(error)
+            testStatus = tr("Didn't work: ", "Не получилось: ", "Не вийшло: ") + Telegram.friendly(error)
         }
     }
 
@@ -532,6 +556,28 @@ struct Instruction: View {
     }
 }
 
+struct LanguageBadge: View {
+    var code: String
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: "globe").font(.system(size: 9, weight: .semibold))
+                Text(code).font(.system(size: 9.5, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(.white.opacity(hovering ? 0.8 : 0.45))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(.white.opacity(hovering ? 0.08 : 0)))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
+    }
+}
+
 struct SettingToggle: View {
     var title: String
     @Binding var isOn: Bool
@@ -540,6 +586,7 @@ struct SettingToggle: View {
             Text(title).font(.system(size: 13))
             Spacer()
             Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).tint(telegramBlue).controlSize(.small)
+                .onChange(of: isOn) { _, _ in UISound.click() }
         }
     }
 }
@@ -643,6 +690,7 @@ struct SecondaryButton: View {
 struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .onChange(of: configuration.isPressed) { _, pressed in if pressed { UISound.click() } }
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }

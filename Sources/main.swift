@@ -12,7 +12,7 @@ final class IslandPanel: NSPanel {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    static let panelSize = CGSize(width: 480, height: 190)
+    static let panelSize = CGSize(width: 480, height: 220)
 
     let model = DropModel()
     var panel: IslandPanel!
@@ -20,11 +20,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var watchTimer: Timer?
     private var screenFrame: NSRect = .zero
     private var notchRight: CGFloat = 0
-    private var coucouRight: CGFloat?
+    private var coucouEdges: CoucouWatcher.Edges?
     private var measuring = false
     private var tick = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        setUpEditMenu()
         setUpPanel()
         setUpStatusItem()
         watchDrags()
@@ -85,13 +86,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         placePanel(animated: false)
     }
 
-    /// Sits right of the notch, or right of Coucou's panel while Coucou is expanded.
+    /// Without Coucou the island hangs from the notch itself, like a Dynamic Island.
+    /// With Coucou it sits right next to it: beside its pills when collapsed, beside its panel when open.
     private func placePanel(animated: Bool) {
         let s = Self.panelSize
-        var x = notchRight + 2
-        if let coucouRight { x = max(x, coucouRight + 12) }
-        x = min(x, screenFrame.maxX - 400)
-        let frame = NSRect(x: x - IslandView.leadingInset, y: screenFrame.maxY - s.height, width: s.width, height: s.height)
+        let besideCoucou = CoucouWatcher.isRunning
+        var x: CGFloat
+        if besideCoucou {
+            var islandLeft = notchRight + 2
+            if Settings.avoidCoucou, let edges = coucouEdges {
+                if let expanded = edges.expanded {
+                    islandLeft = max(islandLeft, expanded + 12)
+                } else if let collapsed = edges.collapsed {
+                    islandLeft = max(islandLeft, collapsed + 10)
+                }
+            }
+            x = min(islandLeft, screenFrame.maxX - 420) - IslandView.leadingInset
+        } else {
+            x = screenFrame.midX - s.width / 2
+        }
+        if model.centered == besideCoucou { model.centered = !besideCoucou }
+
+        let frame = NSRect(x: x, y: screenFrame.maxY - s.height, width: s.width, height: s.height)
         guard frame != panel.frame else { return }
         if animated {
             NSAnimationContext.runAnimationGroup { context in
@@ -104,19 +120,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    /// Re-reads where Coucou ends; the island follows it while visible.
     private func measureCoucou() {
-        guard !measuring, Settings.avoidCoucou else {
-            if !Settings.avoidCoucou, coucouRight != nil { coucouRight = nil; placePanel(animated: true) }
+        guard CoucouWatcher.isRunning, Settings.avoidCoucou else {
+            placePanel(animated: model.phase != .hidden)
             return
         }
+        guard !measuring else { return }
         measuring = true
         let menuBarHeight = model.menuBarHeight
         Task { @MainActor in
-            let right = await CoucouWatcher.expandedRightEdge(menuBarHeight: menuBarHeight)
+            let edges = await CoucouWatcher.edges(menuBarHeight: menuBarHeight)
             self.measuring = false
-            guard right != self.coucouRight else { return }
-            log("coucou panel right edge: \(right.map { String(Int($0)) } ?? "collapsed")")
-            self.coucouRight = right
+            guard edges != self.coucouEdges else { return }
+            log("coucou edges: collapsed \(edges?.collapsed.map { String(Int($0)) } ?? "-"), expanded \(edges?.expanded.map { String(Int($0)) } ?? "-")")
+            self.coucouEdges = edges
             self.placePanel(animated: self.model.phase != .hidden)
         }
     }
@@ -160,14 +178,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
             if m.phase != .hidden { self.updateLook() }
             self.tick += 1
-            if (m.phase == .peek || m.phase == .hover), self.tick % 8 == 0 { self.measureCoucou() }
+            if m.phase != .hidden, self.tick % 8 == 0 { self.measureCoucou() }
         }
         RunLoop.main.add(watchTimer!, forMode: .common)
     }
 
     private func updateLook() {
         let mouse = NSEvent.mouseLocation
-        let center = CGPoint(x: panel.frame.minX + IslandView.leadingInset + 50, y: panel.frame.maxY - 45)
+        let islandLeft = model.centered ? panel.frame.midX - 160 : panel.frame.minX + IslandView.leadingInset
+        let center = CGPoint(x: islandLeft + 50, y: panel.frame.maxY - 45 - (model.centered ? model.menuBarHeight : 0))
         let clamp = { (v: CGFloat) in max(-1, min(1, v)) }
         let look = CGSize(width: clamp((mouse.x - center.x) / 240), height: clamp((center.y - mouse.y) / 160))
         if abs(look.width - model.look.width) + abs(look.height - model.look.height) > 0.02 {
@@ -187,21 +206,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let bot = TGConfig.load() == nil ? tr("No bot connected", "Бот не подключён")
-            : tr("Bot: ", "Бот: ") + (model.botName.map { "@\($0)" } ?? "…")
+        let bot = TGConfig.load() == nil ? tr("No bot connected", "Бот не подключён", "Бота не підключено")
+            : tr("Bot: ", "Бот: ", "Бот: ") + (model.botName.map { "@\($0)" } ?? "…")
         menu.addItem(withTitle: bot, action: nil, keyEquivalent: "").isEnabled = false
         menu.addItem(.separator())
-        menu.addItem(item(tr("Send Files…", "Отправить файлы…"), #selector(pickFiles), "o"))
-        menu.addItem(item(tr("Show Animation", "Показать анимацию"), #selector(demo), "d"))
+        menu.addItem(item(tr("Send Files…", "Отправить файлы…", "Надіслати файли…"), #selector(pickFiles), "o"))
+        menu.addItem(item(tr("Show Animation", "Показать анимацию", "Показати анімацію"), #selector(demo), "d"))
         // Hidden language switch: appears in place of "Show Animation" while ⌥ is held.
-        let language = item(Settings.language == .en ? "Русский язык" : "English", #selector(toggleLanguage), "d")
+        let language = item("🌐 " + Settings.language.next.name, #selector(cycleLanguage), "d")
         language.keyEquivalentModifierMask = [.command, .option]
         language.isAlternate = true
         menu.addItem(language)
         menu.addItem(.separator())
-        menu.addItem(item(tr("Settings…", "Настройки…"), #selector(openSettings), ","))
+        menu.addItem(item(tr("Settings…", "Настройки…", "Налаштування…"), #selector(openSettings), ","))
         menu.addItem(.separator())
-        menu.addItem(item(tr("Quit TeleDrop", "Выйти из TeleDrop"), #selector(quit), "q"))
+        menu.addItem(item(tr("Quit TeleDrop", "Выйти из TeleDrop", "Вийти з TeleDrop"), #selector(quit), "q"))
         model.refreshBotName()
     }
 
@@ -223,7 +242,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func demo() { model.demo() }
 
-    @objc private func toggleLanguage() { model.toggleLanguage() }
+    @objc private func cycleLanguage() { model.cycleLanguage() }
+
+    /// A menu-bar-only app has no main menu, so ⌘X/⌘C/⌘V/⌘A never reach text fields. Give it one.
+    private func setUpEditMenu() {
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let editItem = NSMenuItem()
+        editItem.submenu = edit
+        let app = NSMenu()
+        app.addItem(item("Switch Language", #selector(cycleLanguage), "l"))  // hidden ⌘L
+        let appItem = NSMenuItem()
+        appItem.submenu = app
+        let main = NSMenu()
+        main.addItem(appItem)
+        main.addItem(editItem)
+        NSApp.mainMenu = main
+    }
 
     @objc private func openSettings() { SetupWindow.shared.show(model: model) }
 

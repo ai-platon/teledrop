@@ -18,6 +18,8 @@ final class DropModel: ObservableObject {
     @Published var look: CGSize = .zero
     @Published var botName: String?
     @Published var menuBarHeight: CGFloat = 37
+    /// Hanging from the notch itself (no Coucou): grow around the notch, content below it.
+    @Published var centered = false
     /// Mirrors Settings.language so views redraw when it changes.
     @Published var language = Settings.language
     /// Set by visual tests so the drag watcher doesn't collapse a frozen state.
@@ -59,7 +61,7 @@ final class DropModel: ObservableObject {
         suppressPeekUntil = Date().addingTimeInterval(1.5)
         guard !uploading else { return }
         if phase != .sending { progress = 0 }
-        detail = tr("receiving file…", "получаю файл…")
+        detail = tr("receiving file…", "получаю файл…", "отримую файл…")
         phase = .sending
     }
 
@@ -84,7 +86,7 @@ final class DropModel: ObservableObject {
         log("send \(urls.map(\.path))")
         guard !urls.isEmpty else { phase = .hidden; return }
         guard let cfg = TGConfig.load() else {
-            fail(tr("Connect a bot first", "Сначала подключи бота"))
+            fail(tr("Connect a bot first", "Сначала подключи бота", "Спершу підключи бота"))
             onNeedsSetup?()
             return
         }
@@ -99,7 +101,7 @@ final class DropModel: ObservableObject {
         guard let file = queue.first else { finish(); return }
         queue.removeFirst()
         let index = total - queue.count
-        let label = total > 1 ? "\(file.lastPathComponent) · \(index) " + tr("of", "из") + " \(total)" : file.lastPathComponent
+        let label = total > 1 ? "\(file.lastPathComponent) · \(index) " + tr("of", "из", "з") + " \(total)" : file.lastPathComponent
         progress = 0
         detail = label
         phase = .sending
@@ -113,7 +115,7 @@ final class DropModel: ObservableObject {
                 let count = prepared.parts.count
                 for (i, part) in prepared.parts.enumerated() {
                     await MainActor.run {
-                        self?.detail = count > 1 ? "\(label) · " + tr("part \(i + 1) of \(count)", "часть \(i + 1) из \(count)") : label
+                        self?.detail = count > 1 ? "\(label) · " + tr("part \(i + 1) of \(count)", "часть \(i + 1) из \(count)", "частина \(i + 1) з \(count)") : label
                     }
                     try await Telegram.sendDocument(part, caption: i == 0 ? prepared.caption : nil, cfg: cfg) { fraction in
                         DispatchQueue.main.async { self?.progress = (Double(i) + fraction) / Double(count) }
@@ -165,18 +167,19 @@ final class DropModel: ObservableObject {
         switch name {
         case "peek": phase = .peek
         case "hover": phase = .peek; phase = .hover
-        case "sending": detail = tr("vacation-2026.jpg", "отпуск-2026.jpg"); progress = 0.42; phase = .sending
+        case "sending": detail = tr("vacation-2026.jpg", "отпуск-2026.jpg", "відпустка-2026.jpg"); progress = 0.42; phase = .sending
         case "done": detail = filesCount(3) + " → @\(botName!)"; phase = .done
-        case "error": detail = tr("Press Start in your bot in Telegram", "Нажми Start у бота в Telegram"); phase = .error
+        case "error": detail = tr("Press Start in your bot in Telegram", "Нажми Start у бота в Telegram", "Натисни Start у бота в Telegram"); phase = .error
         case "demo": demo()
         default: phase = .hidden
         }
     }
 
     /// Plays the whole animation without sending anything.
-    func toggleLanguage() {
-        Settings.language = Settings.language == .en ? .ru : .en
-        language = Settings.language
+    func cycleLanguage() {
+        Settings.language = Settings.language.next
+        UISound.language()
+        withAnimation(.easeInOut(duration: 0.35)) { language = Settings.language }
     }
 
     func demo() {
@@ -189,7 +192,7 @@ final class DropModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.setHover(true) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             self.play("Pop", volume: 0.5)
-            self.detail = tr("vacation-2026.jpg", "отпуск-2026.jpg")
+            self.detail = tr("vacation-2026.jpg", "отпуск-2026.jpg", "відпустка-2026.jpg")
             self.progress = 0
             self.phase = .sending
             self.demoTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { t in

@@ -3,10 +3,17 @@ import ScreenCaptureKit
 
 // MARK: - Coucou awareness
 
-/// Finds how far right Coucou's expanded panel reaches, by looking at the pixels of its window
-/// just below the menu bar. Coucou keeps one fixed-size window, so its frame alone doesn't tell.
+/// Where Coucou currently ends on the right, so the island can sit next to it.
+/// Coucou keeps one fixed-size window, so its frame alone doesn't tell; we look at its pixels.
 enum CoucouWatcher {
     static let bundleID = "fr.louisraille.NotchBuddy"
+
+    struct Edges: Equatable {
+        /// Right edge of the collapsed pills in the menu bar.
+        var collapsed: CGFloat?
+        /// Right edge of the expanded panel below the menu bar.
+        var expanded: CGFloat?
+    }
 
     static var isInstalled: Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil
@@ -16,8 +23,8 @@ enum CoucouWatcher {
         NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == bundleID }
     }
 
-    /// Right edge of the expanded panel in screen x, or nil when collapsed, not running or not permitted.
-    static func expandedRightEdge(menuBarHeight: CGFloat) async -> CGFloat? {
+    /// nil when Coucou isn't running or its window can't be read (no Screen Recording permission).
+    static func edges(menuBarHeight: CGFloat) async -> Edges? {
         guard isRunning else { return nil }
         let content: SCShareableContent
         do {
@@ -31,9 +38,12 @@ enum CoucouWatcher {
                 .max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height })
         else { return nil }
 
+        // Only the strip around the menu bar matters: a tiny capture instead of the whole window.
+        let stripHeight = min(window.frame.height, menuBarHeight + 32)
         let config = SCStreamConfiguration()
+        config.sourceRect = CGRect(x: 0, y: 0, width: window.frame.width, height: stripHeight)
         config.width = Int(window.frame.width)
-        config.height = Int(window.frame.height)
+        config.height = Int(stripHeight)
         config.showsCursor = false
         config.ignoreShadowsSingleWindow = true
         let image: CGImage
@@ -45,12 +55,16 @@ enum CoucouWatcher {
             return nil
         }
 
-        let row = Int((menuBarHeight + 24) * CGFloat(image.height) / window.frame.height)
-        guard row < image.height, let x = rightmostOpaque(image, row: row) else { return nil }
-        return window.frame.minX + CGFloat(x) * window.frame.width / CGFloat(image.width)
+        let scale = CGFloat(image.height) / stripHeight
+        let toScreen = { (x: Int) in window.frame.minX + CGFloat(x) * window.frame.width / CGFloat(image.width) }
+        let pillsRow = Int(menuBarHeight * 0.5 * scale)
+        let panelRow = Int((menuBarHeight + 24) * scale)
+        return Edges(collapsed: rightmostOpaque(image, row: pillsRow).map(toScreen),
+                     expanded: rightmostOpaque(image, row: panelRow).map(toScreen))
     }
 
     private static func rightmostOpaque(_ image: CGImage, row: Int) -> Int? {
+        guard row >= 0, row < image.height else { return nil }
         let w = image.width
         var pixels = [UInt8](repeating: 0, count: w * 4)
         let drawn: Bool = pixels.withUnsafeMutableBytes { buffer in

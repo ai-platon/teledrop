@@ -58,11 +58,11 @@ struct DropZone: View {
                                   style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [6, 5], dashPhase: -t * 16))
                 HStack(spacing: 0) {
                     VStack(spacing: 8) {
-                        Text(tr("Drop files here", "Брось файлы сюда"))
+                        Text(tr("Drop files here", "Брось файлы сюда", "Кидай файли сюди"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.8))
                         HStack(spacing: 6) {
-                            ForEach([tr("Photos", "Фото"), tr("Videos", "Видео"), "PDF", tr("Archives", "Архивы")], id: \.self) { chip($0) }
+                            ForEach([tr("Photos", "Фото", "Фото"), tr("Videos", "Видео", "Відео"), "PDF", tr("Archives", "Архивы", "Архіви")], id: \.self) { chip($0) }
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -92,12 +92,15 @@ struct IslandView: View {
 
     private var expanded: Bool { m.phase != .peek && m.phase != .hidden }
 
+    /// Room the content leaves for the camera notch when the island hangs from it.
+    private var notchClearance: CGFloat { m.centered ? m.menuBarHeight - 6 : 0 }
+
     private var size: CGSize {
         switch m.phase {
         case .hidden: CGSize(width: 150, height: 10)
-        case .peek: CGSize(width: 214, height: m.menuBarHeight + 14)
-        case .hover: CGSize(width: 380, height: 128)
-        default: CGSize(width: 320, height: 100)
+        case .peek: CGSize(width: m.centered ? 250 : 214, height: m.menuBarHeight + (m.centered ? 40 : 14))
+        case .hover: CGSize(width: 380, height: 128 + notchClearance)
+        default: CGSize(width: 320, height: 100 + notchClearance)
         }
     }
 
@@ -113,18 +116,18 @@ struct IslandView: View {
 
     private var title: String {
         switch m.phase {
-        case .hidden, .peek: tr("To Telegram", "В Telegram")
-        case .hover: tr("Let go — I'll send it", "Отпусти — отправлю")
-        case .sending: m.progress < 0.01 ? tr("Preparing…", "Готовлю файл…") : tr("Sending… ", "Отправляю… ") + "\(Int(m.progress * 100))%"
-        case .done: tr("Sent", "Отправлено")
-        case .error: tr("Didn't work", "Не получилось")
+        case .hidden, .peek: tr("To Telegram", "В Telegram", "У Telegram")
+        case .hover: tr("Let go — I'll send it", "Отпусти — отправлю", "Відпусти — надішлю")
+        case .sending: m.progress < 0.01 ? tr("Preparing…", "Готовлю файл…", "Готую файл…") : tr("Sending… ", "Отправляю… ", "Надсилаю… ") + "\(Int(m.progress * 100))%"
+        case .done: tr("Sent", "Отправлено", "Надіслано")
+        case .error: tr("Didn't work", "Не получилось", "Не вийшло")
         }
     }
 
     private var subtitle: String {
         switch m.phase {
-        case .hidden, .peek: tr("drag a file here", "перетащи файл сюда")
-        case .hover: m.botName.map { "@\($0)" } ?? tr("Telegram bot", "бот Telegram")
+        case .hidden, .peek: tr("drag a file here", "перетащи файл сюда", "перетягни файл сюди")
+        case .hover: m.botName.map { "@\($0)" } ?? tr("Telegram bot", "бот Telegram", "бот Telegram")
         default: m.detail
         }
     }
@@ -153,13 +156,14 @@ struct IslandView: View {
                 if hover {
                     DropZone(look: m.look)
                         .padding(.horizontal, Self.flare + 10)
-                        .padding(.top, 10)
+                        .padding(.top, 10 + notchClearance)
                         .padding(.bottom, 12)
                         .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
                 } else {
                     content
                         .padding(.leading, Self.flare + (expanded ? 18 : 12))
                         .padding(.trailing, Self.flare + 16)
+                        .padding(.top, m.phase == .peek && m.centered ? m.menuBarHeight : notchClearance)
                         .transition(.opacity)
                 }
             }
@@ -173,9 +177,10 @@ struct IslandView: View {
         .drawingGroup()
         .padding(-Self.shadowRoom)
         .opacity(m.phase == .hidden ? 0 : 1)
-        .padding(.leading, Self.leadingInset)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.leading, m.centered ? 0 : Self.leadingInset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: m.centered ? .top : .topLeading)
         .animation(.spring(response: 0.42, dampingFraction: 0.72), value: m.phase)
+        .animation(.easeInOut(duration: 0.3), value: m.language)
     }
 
     private var content: some View {
@@ -228,8 +233,9 @@ final class DropView: NSView {
     /// Only the island (with some slack) accepts drops, not the whole transparent panel.
     private func overIsland(_ info: NSDraggingInfo) -> Bool {
         let p = convert(info.draggingLocation, from: nil)
-        let rect = NSRect(x: IslandView.leadingInset - 16, y: bounds.maxY - 150,
-                          width: 380 + 32, height: 150)
+        let width: CGFloat = 380 + 32, height: CGFloat = 185
+        let x = model.centered ? bounds.midX - width / 2 : IslandView.leadingInset - 16
+        let rect = NSRect(x: x, y: bounds.maxY - height, width: width, height: height)
         return rect.contains(p)
     }
 
@@ -265,7 +271,7 @@ final class DropView: NSView {
 
         guard let promises = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self]) as? [NSFilePromiseReceiver],
               !promises.isEmpty else {
-            model.fail(tr("Couldn't read the file", "Не удалось прочитать файл"))
+            model.fail(tr("Couldn't read the file", "Не удалось прочитать файл", "Не вдалося прочитати файл"))
             return false
         }
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("TeleDrop-\(UUID().uuidString)")

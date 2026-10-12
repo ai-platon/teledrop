@@ -74,8 +74,8 @@ enum Telegram {
     static func friendly(_ error: Error) -> String {
         if let urlError = error as? URLError {
             switch urlError.code {
-            case .notConnectedToInternet, .networkConnectionLost: return tr("No internet connection", "Нет интернета")
-            case .timedOut: return tr("Telegram didn't answer in time", "Telegram не ответил вовремя")
+            case .notConnectedToInternet, .networkConnectionLost: return tr("No internet connection", "Нет интернета", "Немає інтернету")
+            case .timedOut: return tr("Telegram didn't answer in time", "Telegram не ответил вовремя", "Telegram не відповів вчасно")
             default: break
             }
         }
@@ -83,16 +83,16 @@ enum Telegram {
     }
 
     private static func friendly(_ description: String?) -> String {
-        guard let description else { return tr("Unknown Telegram error", "Неизвестная ошибка Telegram") }
-        if description.contains("chat not found") { return tr("Press Start in your bot in Telegram", "Нажми Start у бота в Telegram") }
-        if description.contains("Unauthorized") || description.contains("Not Found") { return tr("That token didn't work", "Токен не подошёл") }
-        if description.contains("blocked by the user") { return tr("The bot is blocked — unblock it in Telegram", "Бот заблокирован — разблокируй его в Telegram") }
-        if description.contains("too big") { return tr("File is too big for Telegram", "Файл слишком большой для Telegram") }
+        guard let description else { return tr("Unknown Telegram error", "Неизвестная ошибка Telegram", "Невідома помилка Telegram") }
+        if description.contains("chat not found") { return tr("Press Start in your bot in Telegram", "Нажми Start у бота в Telegram", "Натисни Start у бота в Telegram") }
+        if description.contains("Unauthorized") || description.contains("Not Found") { return tr("That token didn't work", "Токен не подошёл", "Токен не підійшов") }
+        if description.contains("blocked by the user") { return tr("The bot is blocked — unblock it in Telegram", "Бот заблокирован — разблокируй его в Telegram", "Бота заблоковано — розблокуй його в Telegram") }
+        if description.contains("too big") { return tr("File is too big for Telegram", "Файл слишком большой для Telegram", "Файл завеликий для Telegram") }
         return description
     }
 
     private static func call(_ token: String, _ method: String, _ params: [String: String] = [:]) async throws -> Any {
-        guard isTokenShaped(token) else { throw UploadError(tr("That token didn't work", "Токен не подошёл")) }
+        guard isTokenShaped(token) else { throw UploadError(tr("That token didn't work", "Токен не подошёл", "Токен не підійшов")) }
         var components = URLComponents(string: "https://api.telegram.org/bot\(token)/\(method)")!
         if !params.isEmpty { components.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) } }
         let (data, _) = try await URLSession.shared.data(from: components.url!)
@@ -152,13 +152,13 @@ enum Packer {
     static func prepare(_ file: URL, status: (String) -> Void) throws -> PreparedFile {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isDir) else {
-            throw UploadError(tr("File not found", "Файл не найден"))
+            throw UploadError(tr("File not found", "Файл не найден", "Файл не знайдено"))
         }
         if !isDir.boolValue, size(of: file) <= Telegram.partLimit {
             return PreparedFile(parts: [file], caption: nil, workDir: nil)
         }
 
-        status(isDir.boolValue ? tr("zipping folder…", "упаковываю папку…") : tr("over 49 MB — zipping…", "больше 49 МБ — упаковываю в zip…"))
+        status(isDir.boolValue ? tr("zipping folder…", "упаковываю папку…", "пакую папку…") : tr("over 49 MB — zipping…", "больше 49 МБ — упаковываю в zip…", "понад 49 МБ — пакую в zip…"))
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("TeleDrop-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         let zip = work.appendingPathComponent(file.lastPathComponent + ".zip")
@@ -167,7 +167,7 @@ enum Packer {
             return PreparedFile(parts: [zip], caption: nil, workDir: work)
         }
 
-        status(tr("splitting into 49 MB parts…", "режу на части по 49 МБ…"))
+        status(tr("splitting into 49 MB parts…", "режу на части по 49 МБ…", "ріжу на частини по 49 МБ…"))
         let parts = try split(zip)
         try? FileManager.default.removeItem(at: zip)
         let name = zip.lastPathComponent
@@ -178,6 +178,10 @@ enum Packer {
         """, """
         📦 \(name) — \(partsCount(parts.count)).
         Открой первую часть в 7-Zip, The Unarchiver или Keka, или склей на Mac:
+        cat "\(name)".* > "\(name)"
+        """, """
+        📦 \(name) — \(partsCount(parts.count)).
+        Відкрий першу частину в 7-Zip, The Unarchiver або Keka, або склей на Mac:
         cat "\(name)".* > "\(name)"
         """)
         return PreparedFile(parts: parts, caption: caption, workDir: work)
@@ -193,7 +197,7 @@ enum Packer {
         process.arguments = arguments
         try process.run()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw UploadError(tr("Couldn't zip the file", "Не удалось упаковать файл")) }
+        guard process.terminationStatus == 0 else { throw UploadError(tr("Couldn't zip the file", "Не удалось упаковать файл", "Не вдалося запакувати файл")) }
     }
 
     private static func split(_ file: URL) throws -> [URL] {

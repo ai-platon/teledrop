@@ -1,20 +1,54 @@
-import Foundation
+import AppKit
 
-/// The UI is English. Russian is a hidden option: ⌥-click the version in Settings,
-/// or hold ⌥ while the menu bar menu is open.
-enum Lang: String { case en, ru }
+/// The UI is English. Ukrainian and Russian are tucked away: ⌘L anywhere in the app,
+/// the 🌐 badge that appears while ⌥ is held, or ⌥ in the menu bar menu. Order: EN → UK → RU.
+enum Lang: String, CaseIterable {
+    case en, uk, ru
 
-func tr(_ en: String, _ ru: String) -> String { Settings.language == .ru ? ru : en }
+    var name: String {
+        switch self {
+        case .en: "English"
+        case .ru: "Русский"
+        case .uk: "Українська"
+        }
+    }
+
+    var next: Lang {
+        let all = Lang.allCases
+        return all[(all.firstIndex(of: self)! + 1) % all.count]
+    }
+}
+
+func tr(_ en: String, _ ru: String, _ uk: String) -> String {
+    switch Settings.language {
+    case .en: en
+    case .ru: ru
+    case .uk: uk
+    }
+}
 
 func filesCount(_ n: Int) -> String {
-    tr(n == 1 ? "1 file" : "\(n) files", ruCount(n, "файл", "файла", "файлов"))
+    tr(n == 1 ? "1 file" : "\(n) files", slavicCount(n, "файл", "файла", "файлов"), slavicCount(n, "файл", "файли", "файлів"))
 }
 
 func partsCount(_ n: Int) -> String {
-    tr(n == 1 ? "1 part" : "\(n) parts", ruCount(n, "часть", "части", "частей"))
+    tr(n == 1 ? "1 part" : "\(n) parts", slavicCount(n, "часть", "части", "частей"), slavicCount(n, "частина", "частини", "частин"))
 }
 
-private func ruCount(_ n: Int, _ one: String, _ few: String, _ many: String) -> String {
+/// Russian and Ukrainian share the plural rules: 1 / 2–4 / 5+ (11–14 are "many").
+/// Soft click for buttons and toggles in the app (respects the Sounds setting).
+enum UISound {
+    static func click() { play("Tink", volume: 0.18) }
+    static func language() { play("Pop", volume: 0.3) }
+
+    private static func play(_ name: String, volume: Float) {
+        guard Settings.soundsOn, let sound = NSSound(named: name)?.copy() as? NSSound else { return }
+        sound.volume = volume
+        sound.play()
+    }
+}
+
+private func slavicCount(_ n: Int, _ one: String, _ few: String, _ many: String) -> String {
     let m10 = n % 10, m100 = n % 100
     let word = m10 == 1 && m100 != 11 ? one : (2...4).contains(m10) && !(12...14).contains(m100) ? few : many
     return "\(n) \(word)"
