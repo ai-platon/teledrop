@@ -14,6 +14,12 @@ enum Telegram {
     struct Bot { let username: String; let name: String }
     struct Chat { let id: String; let name: String }
 
+    /// Finds a bot token anywhere in a text — e.g. the whole BotFather message pasted at once.
+    static func extractToken(_ text: String) -> String? {
+        guard let range = text.range(of: #"\d{5,}:[A-Za-z0-9_-]{30,}"#, options: .regularExpression) else { return nil }
+        return String(text[range])
+    }
+
     static func isTokenShaped(_ token: String) -> Bool {
         token.range(of: #"^\d{5,}:[A-Za-z0-9_-]{30,}$"#, options: .regularExpression) != nil
     }

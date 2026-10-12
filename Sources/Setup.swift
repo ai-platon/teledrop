@@ -55,6 +55,11 @@ struct SetupView: View {
     @State private var sounds = Settings.soundsOn
     @State private var avoidCoucou = Settings.avoidCoucou
     @State private var testStatus: String?
+    /// Clipboard changed while the user was away (copying the token in BotFather).
+    @State private var clipboardOffer = false
+    @State private var clipboardSeen = NSPasteboard.general.changeCount
+    @State private var clipboardNote: String?
+    @State private var autoAdvance = false
 
     private var botUsername: String {
         if case .valid(let name) = tokenState { return name }
@@ -92,6 +97,13 @@ struct SetupView: View {
         .frame(width: 480, height: 560)
         .preferredColorScheme(.dark)
         .animation(.spring(response: 0.45, dampingFraction: 0.86), value: step)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: clipboardOffer)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            noticeClipboard()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            noticeClipboard()
+        }
     }
 
     // MARK: Header
@@ -140,6 +152,10 @@ struct SetupView: View {
                 Instruction(n: 2, text: LocalizedStringKey(tr("Send the **/newbot** command", "Отправь команду **/newbot**")))
                 Instruction(n: 3, text: LocalizedStringKey(tr("Pick a name and a username — it must end in **bot**", "Придумай имя и юзернейм — он должен заканчиваться на **bot**")))
                 Instruction(n: 4, text: LocalizedStringKey(tr("BotFather replies with a **token** — copy it", "BotFather пришлёт **токен** — скопируй его")))
+                Label(tr("Then just come back here — I'll pick the token up", "Потом просто вернись сюда — я подхвачу токен"),
+                      systemImage: "sparkles")
+                    .font(.system(size: 12))
+                    .foregroundStyle(telegramBlue)
             }
             HStack {
                 SecondaryButton(title: tr("Open @BotFather", "Открыть @BotFather"), icon: "arrow.up.right") { openTelegram("BotFather") }
@@ -153,6 +169,9 @@ struct SetupView: View {
         VStack(spacing: 16) {
             Card {
                 CardTitle(number: 2, text: tr("Paste the bot token", "Вставь токен бота"))
+                if clipboardOffer && !isValid {
+                    clipboardBanner
+                }
                 HStack(spacing: 8) {
                     Group {
                         if revealToken {
@@ -167,11 +186,7 @@ struct SetupView: View {
                         Image(systemName: revealToken ? "eye.slash" : "eye").foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    Button(tr("Paste", "Вставить")) {
-                        if let text = NSPasteboard.general.string(forType: .string) {
-                            token = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                        }
-                    }
+                    Button(tr("Paste", "Вставить")) { pasteFromClipboard() }
                     .buttonStyle(.plain)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(telegramBlue)
@@ -181,7 +196,12 @@ struct SetupView: View {
                 .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(.white.opacity(0.06)))
                 .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(fieldBorder, lineWidth: 1))
 
-                tokenStatus
+                if let clipboardNote {
+                    Label(clipboardNote, systemImage: "doc.on.clipboard")
+                        .font(.system(size: 12)).foregroundStyle(.orange)
+                } else {
+                    tokenStatus
+                }
                 Text(tr("The token stays on this Mac and is only ever sent to Telegram.", "Токен хранится только на этом Mac и уходит только в Telegram."))
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
@@ -189,10 +209,15 @@ struct SetupView: View {
             HStack {
                 SecondaryButton(title: tr("Back", "Назад"), icon: "chevron.left") { step = .create }
                 Spacer()
-                PrimaryButton(title: tr("Next", "Дальше"), enabled: isValid) { step = .start }
+                PrimaryButton(title: tr("Next", "Дальше"), enabled: isValid,
+                              isDefault: !(clipboardOffer && !isValid)) { step = .start }
             }
         }
         .task(id: token) { await checkToken() }
+        .onAppear {
+            // Came here with something already copied: offer it right away.
+            if token.isEmpty, NSPasteboard.general.types?.contains(.string) == true { clipboardOffer = true }
+        }
     }
 
     private var fieldBorder: Color {
@@ -347,8 +372,57 @@ struct SetupView: View {
 
     // MARK: Actions
 
+    private var clipboardBanner: some View {
+        Button(action: pasteFromClipboard) {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.on.clipboard.fill").font(.system(size: 16))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tr("Paste token from clipboard", "Вставить токен из буфера"))
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(tr("Copied it in BotFather? Just one click.", "Скопировал в BotFather? Всего один клик."))
+                        .font(.system(size: 11)).opacity(0.8)
+                }
+                Spacer()
+                Image(systemName: "return").font(.system(size: 12, weight: .semibold)).opacity(0.7)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(height: 52)
+            .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(telegramBlue.gradient))
+            .shadow(color: telegramBlue.opacity(0.45), radius: 10, y: 3)
+        }
+        .buttonStyle(PressStyle())
+        .keyboardShortcut(.defaultAction)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    /// Back from Telegram with a fresh clipboard: jump to the token step and offer to paste.
+    private func noticeClipboard() {
+        guard step == .create || step == .token, !isValid else { return }
+        let pasteboard = NSPasteboard.general
+        guard pasteboard.changeCount != clipboardSeen, pasteboard.types?.contains(.string) == true else { return }
+        clipboardSeen = pasteboard.changeCount
+        clipboardNote = nil
+        clipboardOffer = true
+        if step == .create { step = .token }
+    }
+
+    /// Reading happens only on a click, so macOS doesn't flag a silent clipboard read.
+    private func pasteFromClipboard() {
+        let text = NSPasteboard.general.string(forType: .string) ?? ""
+        guard let found = Telegram.extractToken(text) else {
+            clipboardNote = tr("No token in the clipboard — copy it in BotFather (tap the token to copy)",
+                               "В буфере нет токена — скопируй его в BotFather (нажми на токен)")
+            return
+        }
+        clipboardNote = nil
+        clipboardOffer = false
+        autoAdvance = true
+        token = found
+    }
+
     private func checkToken() async {
-        let candidate = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate = Telegram.extractToken(token) ?? token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !candidate.isEmpty else { tokenState = .empty; return }
         guard Telegram.isTokenShaped(candidate) else {
             tokenState = .invalid(tr("Doesn't look like a token — copy the whole thing from BotFather", "Не похоже на токен — скопируй его из BotFather целиком"))
@@ -361,6 +435,11 @@ struct SetupView: View {
             let bot = try await Telegram.getMe(candidate)
             guard !Task.isCancelled else { return }
             tokenState = .valid(bot.username)
+            if autoAdvance {
+                autoAdvance = false
+                try? await Task.sleep(for: .milliseconds(800))
+                if step == .token, isValid { step = .start }
+            }
         } catch {
             guard !Task.isCancelled else { return }
             tokenState = .invalid(Telegram.friendly(error))
@@ -368,7 +447,7 @@ struct SetupView: View {
     }
 
     private func waitForChat() async {
-        let candidate = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate = Telegram.extractToken(token) ?? token.trimmingCharacters(in: .whitespacesAndNewlines)
         while !Task.isCancelled, step == .start, foundChat == nil {
             if let chat = try? await Telegram.latestPrivateChat(candidate) {
                 Settings.token = candidate
@@ -514,6 +593,7 @@ struct PrimaryButton: View {
     var title: String
     var icon: String?
     var enabled = true
+    var isDefault = true
     var action: () -> Void
     @State private var hovering = false
 
@@ -533,7 +613,7 @@ struct PrimaryButton: View {
         .buttonStyle(PressStyle())
         .disabled(!enabled)
         .onHover { hovering = $0 }
-        .keyboardShortcut(.defaultAction)
+        .keyboardShortcut(isDefault ? .defaultAction : nil)
     }
 }
 
