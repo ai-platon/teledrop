@@ -264,8 +264,7 @@ final class DropView: NSView {
 
     /// Browsers often drag a link instead of a file; images and text can come without a file too.
     private func acceptNonFile(_ pasteboard: NSPasteboard) -> Bool {
-        if let links = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL],
-           let link = links.first(where: { ["http", "https", "data"].contains($0.scheme?.lowercased() ?? "") }) {
+        if let link = webLink(in: pasteboard) {
             model.sendLink(link)
             return true
         }
@@ -305,10 +304,13 @@ final class DropView: NSView {
             return true
         }
 
-        guard let promises = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self]) as? [NSFilePromiseReceiver],
-              !promises.isEmpty else {
-            return acceptNonFile(pasteboard)
-        }
+        // Chrome offers a file promise with no files in it next to the link; only trust promises
+        // that actually name files, and keep the link as a fallback while the pasteboard is readable.
+        let promises = (pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self]) as? [NSFilePromiseReceiver] ?? [])
+            .filter { !$0.fileNames.isEmpty }
+        log("promises: \(promises.map(\.fileNames))")
+        guard !promises.isEmpty else { return acceptNonFile(pasteboard) }
+        let fallbackLink = webLink(in: pasteboard)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("TeleDrop-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let group = DispatchGroup()
@@ -327,7 +329,19 @@ final class DropView: NSView {
                 group.leave()
             }
         }
-        group.notify(queue: .main) { self.model.send(urls) }
+        group.notify(queue: .main) {
+            if urls.isEmpty, let fallbackLink {
+                log("promise gave nothing, sending the link instead")
+                self.model.sendLink(fallbackLink)
+            } else {
+                self.model.send(urls)
+            }
+        }
         return true
+    }
+
+    private func webLink(in pasteboard: NSPasteboard) -> URL? {
+        (pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL])?
+            .first { ["http", "https", "data"].contains($0.scheme?.lowercased() ?? "") }
     }
 }
