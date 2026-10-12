@@ -7,11 +7,17 @@ TeleDrop puts a small drop zone right next to the notch. Start dragging a file, 
 ## Features
 
 - **Notch drop zone** that appears only while you drag files, with smooth spring animations
-- **Anything you can drag**: files, folders, photos, screenshot thumbnails, images from browsers
+- **Anything you can drag**: files, folders, photos, screenshot thumbnails; from a browser, pictures go as
+  pictures, links as link messages, selected text as a message
+- **Live progress**, including files that first have to come down from iCloud
 - **Big files**: up to 49 MB goes as is; bigger files are zipped, and a zip that is still too big is split into `.001`, `.002`… parts (open with 7-Zip, The Unarchiver or Keka, or `cat name.zip.* > name.zip`)
-- **3-step setup**: create a bot in @BotFather, paste the token, press Start — TeleDrop finds your chat itself
+- **3-step setup**: create a bot in @BotFather, copy the token and come back — TeleDrop picks it up from the
+  clipboard and finds your chat itself
 - **Private**: no servers in between — files go straight from your Mac to Telegram's Bot API
-- Plays nice with **Coucou**: slides aside when Coucou's panel is open
+- Hangs from the notch like a Dynamic Island; with **Coucou** running it sits right next to it and follows it
+- Fits every MacBook, 13" to 16", with or without a notch
+- Its own sounds (an engine that revs with the upload) and a **Halloween** theme (Oct 20 – Nov 5, or any time)
+- English; Ukrainian and Russian with ⌘L
 - Universal app: Apple Silicon and Intel, macOS 14+
 
 ## Install
