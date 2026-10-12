@@ -275,16 +275,22 @@ final class DropView: NSView {
     /// Browsers often drag a link instead of a file; images and text can come without a file too.
     private func acceptNonFile(_ pasteboard: NSPasteboard) -> Bool {
         // A picture wins over the link around it (Chrome puts both on the pasteboard).
+        // Keep the picture's own format when the browser provides it (a JPEG stays a JPEG).
+        let original: [(String, String)] = [("public.jpeg", "jpg"), ("public.png", "png"), ("com.compuserve.gif", "gif"),
+                                            ("org.webmproject.webp", "webp"), ("public.heic", "heic")]
+        for (type, ext) in original {
+            if let data = pasteboard.data(forType: NSPasteboard.PasteboardType(type)) {
+                model.send([saveDroppedImage(data, ext: ext, pasteboard: pasteboard)])
+                return true
+            }
+        }
         let imageTypes: Set<String> = ["public.tiff", "public.png", "public.jpeg", "com.compuserve.gif", "public.heic"]
         if pasteboard.types?.contains(where: { imageTypes.contains($0.rawValue) }) == true,
            let image = (pasteboard.readObjects(forClasses: [NSImage.self]) as? [NSImage])?.first,
            let tiff = image.tiffRepresentation,
            let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-            let file = FileManager.default.temporaryDirectory.appendingPathComponent("Image \(Int(Date().timeIntervalSince1970)).png")
-            if (try? png.write(to: file)) != nil {
-                model.send([file])
-                return true
-            }
+            model.send([saveDroppedImage(png, ext: "png", pasteboard: pasteboard)])
+            return true
         }
         if let link = webLink(in: pasteboard) {
             model.sendLink(link)
@@ -351,6 +357,21 @@ final class DropView: NSView {
             }
         }
         return true
+    }
+
+    /// Names a dropped picture after the image in its link when there is one, else "Image <time>".
+    private func saveDroppedImage(_ data: Data, ext: String, pasteboard: NSPasteboard) -> URL {
+        var name = webLink(in: pasteboard).map { $0.deletingPathExtension().lastPathComponent } ?? ""
+        if name.isEmpty || name.count > 60 || name == "/" {
+            let stamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+                .replacingOccurrences(of: ":", with: ".")
+            name = "Image \(stamp)"
+        }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("TeleDrop-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent(name).appendingPathExtension(ext)
+        try? data.write(to: file)
+        return file
     }
 
     private func webLink(in pasteboard: NSPasteboard) -> URL? {

@@ -180,6 +180,48 @@ final class DropModel: ObservableObject {
         detail = label
         phase = .sending
 
+        Task { @MainActor [weak self] in
+            await self?.downloadFromCloud(file)
+            self?.upload(file, label: label, cfg: cfg)
+        }
+    }
+
+    /// Files on an iCloud-synced Desktop/Documents are often only in the cloud. Download them
+    /// first, showing the same progress Finder shows, so the island never sits silent.
+    @MainActor
+    private func downloadFromCloud(_ url: URL) async {
+        var probe = url
+        probe.removeAllCachedResourceValues()
+        guard let values = try? probe.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]),
+              values.isUbiquitousItem == true, values.ubiquitousItemDownloadingStatus != .current else { return }
+        log("downloading \(url.lastPathComponent) from iCloud")
+        fromCloud = true
+        stage = .reading
+        readProgress = 0.001
+        var observation: NSKeyValueObservation?
+        let token = Progress.addSubscriber(forFileURL: url) { progress in
+            observation = progress.observe(\.fractionCompleted) { p, _ in
+                let fraction = p.fractionCompleted
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.readProgress = max(self.readProgress, fraction)
+                }
+            }
+            return { observation = nil }
+        }
+        defer { Progress.removeSubscriber(token) }
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+        let deadline = Date().addingTimeInterval(600)
+        while Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(250))
+            var check = url
+            check.removeAllCachedResourceValues()
+            let status = (try? check.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus
+            if status == .current { break }
+        }
+    }
+
+    private func upload(_ file: URL, label: String, cfg: TGConfig) {
         Task.detached(priority: .userInitiated) { [weak self] in
             do {
                 let prepared = try Packer.prepare(file) { status in
