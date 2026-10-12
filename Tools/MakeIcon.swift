@@ -10,7 +10,7 @@ struct IconView: View {
             squircle
                 .fill(LinearGradient(colors: [Color(red: 0.12, green: 0.13, blue: 0.16), Color(red: 0.03, green: 0.035, blue: 0.045)],
                                      startPoint: .top, endPoint: .bottom))
-            RadialGradient(colors: [telegramBlue.opacity(0.55), telegramBlue.opacity(0.08), .clear],
+            RadialGradient(colors: [accent.opacity(0.55), accent.opacity(0.08), .clear],
                            center: UnitPoint(x: 0.5, y: 0.78), startRadius: 0, endRadius: 430)
                 .clipShape(squircle)
             // The notch the app lives next to.
@@ -30,6 +30,7 @@ struct IconView: View {
 }
 
 MainActor.assumeIsolated {
+    Theme.override = false  // the icon always uses the classic look
     let dir = URL(fileURLWithPath: CommandLine.arguments[1])
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     let renderer = ImageRenderer(content: IconView())

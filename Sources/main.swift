@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var tick = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Theme.override = Settings.halloween
         setUpEditMenu()
         setUpPanel()
         setUpStatusItem()

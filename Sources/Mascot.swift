@@ -1,6 +1,29 @@
 import SwiftUI
 
-let telegramBlue = Color(red: 0.17, green: 0.65, blue: 0.93)
+/// Look of the app: the classic blue, or the Halloween pumpkin.
+enum Theme {
+    static let blue = Color(red: 0.17, green: 0.65, blue: 0.93)
+    static let pumpkin = Color(red: 1.0, green: 0.55, blue: 0.1)
+    static let stem = Color(red: 0.27, green: 0.45, blue: 0.18)
+
+    /// Set by the app from Settings (nil = automatic: October through November 2).
+    static var override: Bool?
+
+    static var isHalloween: Bool { override ?? inSeason }
+
+    static var inSeason: Bool {
+        let c = Calendar.current.dateComponents([.month, .day], from: Date())
+        return c.month == 10 || (c.month == 11 && (c.day ?? 99) <= 2)
+    }
+}
+
+/// The accent color of the current theme.
+var accent: Color { Theme.isHalloween ? Theme.pumpkin : Theme.blue }
+
+/// A lighter shade of the accent, for gradients and glints.
+var accentLight: Color {
+    Theme.isHalloween ? Color(red: 1, green: 0.76, blue: 0.38) : Color(red: 0.36, green: 0.8, blue: 1)
+}
 
 // MARK: - Shapes
 
@@ -30,6 +53,38 @@ struct IslandShape: Shape {
     }
 }
 
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// A carved pumpkin grin with two teeth.
+struct JaggedGrin: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        var p = Path()
+        p.move(to: CGPoint(x: 0, y: 0))
+        p.addQuadCurve(to: CGPoint(x: w, y: 0), control: CGPoint(x: w / 2, y: h * 0.5))
+        p.addQuadCurve(to: CGPoint(x: w * 0.5, y: h), control: CGPoint(x: w * 0.85, y: h))
+        p.addQuadCurve(to: CGPoint(x: 0, y: 0), control: CGPoint(x: w * 0.15, y: h))
+        // Two teeth hanging from the top edge (cut out with even-odd fill).
+        let edge = { (x: CGFloat) in x * (1 - x) * h }
+        for x: CGFloat in [0.3, 0.56] {
+            p.move(to: CGPoint(x: w * x, y: edge(x)))
+            p.addLine(to: CGPoint(x: w * (x + 0.14), y: edge(x + 0.14)))
+            p.addLine(to: CGPoint(x: w * (x + 0.07), y: h * 0.62))
+            p.closeSubpath()
+        }
+        return p
+    }
+}
+
 struct ArcShape: Shape {
     var up = true
     func path(in rect: CGRect) -> Path {
@@ -51,7 +106,7 @@ struct Blob: View {
     var size: CGFloat
     @State private var blink = false
 
-    private var tint: Color { mood == .sad ? Color(red: 0.94, green: 0.42, blue: 0.45) : telegramBlue }
+    private var tint: Color { mood == .sad ? Color(red: 0.94, green: 0.42, blue: 0.45) : accent }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60, paused: mood != .eating)) { context in
@@ -64,9 +119,11 @@ struct Blob: View {
                         RoundedRectangle(cornerRadius: size * 0.4, style: .continuous)
                             .fill(LinearGradient(colors: [.white.opacity(0.3), .clear], startPoint: .top, endPoint: .center))
                     )
+                if Theme.isHalloween { pumpkinRibs }
                 face(t).offset(x: look.width * size * 0.1, y: look.height * size * 0.06)
             }
             .frame(width: size, height: size * 0.86)
+            .overlay(alignment: .top) { if Theme.isHalloween { pumpkinStem } }
             .scaleEffect(x: 1 + squash, y: 1 - squash, anchor: .bottom)
         }
         .overlay(alignment: .bottomTrailing) { badge.offset(x: size * 0.14, y: size * 0.1) }
@@ -93,14 +150,26 @@ struct Blob: View {
             Capsule().fill(.black).frame(width: size * 0.13, height: size * 0.07).frame(height: size * 0.17)
         default:
             let big = mood == .excited
-            Capsule().fill(.black)
-                .frame(width: size * (big ? 0.15 : 0.12), height: size * (big ? 0.2 : 0.16) * (blink ? 0.12 : 1))
-                .frame(height: size * 0.2)
+            if Theme.isHalloween {
+                // Jack-o'-lantern eyes.
+                Triangle().fill(.black)
+                    .frame(width: size * (big ? 0.17 : 0.14), height: size * (big ? 0.15 : 0.12) * (blink ? 0.15 : 1))
+                    .frame(height: size * 0.2)
+            } else {
+                Capsule().fill(.black)
+                    .frame(width: size * (big ? 0.15 : 0.12), height: size * (big ? 0.2 : 0.16) * (blink ? 0.12 : 1))
+                    .frame(height: size * 0.2)
+            }
         }
     }
 
     @ViewBuilder private func mouth(_ t: Double) -> some View {
         switch mood {
+        case .excited where Theme.isHalloween, .idle where Theme.isHalloween:
+            JaggedGrin().fill(.black.opacity(0.9), style: FillStyle(eoFill: true)).frame(width: size * 0.36, height: size * 0.11)
+        case .eating where Theme.isHalloween:
+            JaggedGrin().fill(.black.opacity(0.9), style: FillStyle(eoFill: true))
+                .frame(width: size * 0.34, height: size * (0.05 + 0.08 * abs(sin(t * 9))))
         case .excited:
             Ellipse().fill(.black.opacity(0.85)).frame(width: size * 0.17, height: size * 0.12)
         case .eating:
@@ -116,9 +185,37 @@ struct Blob: View {
         }
     }
 
+    /// Pumpkin segments: darker curved bands down the body.
+    private var pumpkinRibs: some View {
+        ZStack {
+            ForEach([-0.36, 0.36], id: \.self) { x in
+                Ellipse()
+                    .stroke(Color(red: 0.62, green: 0.27, blue: 0).opacity(0.22), lineWidth: size * 0.025)
+                    .frame(width: size * 0.5, height: size * 1.05)
+                    .offset(x: size * x)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.4, style: .continuous))
+    }
+
+    private var pumpkinStem: some View {
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: size * 0.03)
+                .fill(Theme.stem.gradient)
+                .frame(width: size * 0.1, height: size * 0.17)
+                .rotationEffect(.degrees(12), anchor: .bottom)
+            Ellipse()
+                .fill(Theme.stem.opacity(0.9))
+                .frame(width: size * 0.16, height: size * 0.08)
+                .rotationEffect(.degrees(-25))
+                .offset(x: size * 0.07, y: -size * 0.06)
+        }
+        .offset(y: -size * 0.13)
+    }
+
     private var badge: some View {
         let symbol = mood == .happy ? "checkmark" : mood == .sad ? "exclamationmark" : "paperplane.fill"
-        let color: Color = mood == .happy ? Color(red: 0.2, green: 0.75, blue: 0.4) : mood == .sad ? .red : telegramBlue
+        let color: Color = mood == .happy ? Color(red: 0.2, green: 0.75, blue: 0.4) : mood == .sad ? .red : accent
         return Circle()
             .fill(.white)
             .frame(width: size * 0.42, height: size * 0.42)
@@ -135,5 +232,53 @@ struct Blob: View {
             try? await Task.sleep(for: .milliseconds(110))
             withAnimation(.easeOut(duration: 0.1)) { blink = false }
         }
+    }
+}
+
+/// A few bats fluttering around — Halloween decoration. `t` comes from the caller's TimelineView.
+struct Bats: View {
+    var t: Double
+    var count: Int
+
+    var body: some View {
+        GeometryReader { g in
+            ForEach(0..<count, id: \.self) { i in
+                let speed = 0.09 + Double(i) * 0.035
+                let x = (t * speed + Double(i) * 0.37).truncatingRemainder(dividingBy: 1)
+                let y = 0.3 + 0.18 * sin(t * 1.3 + Double(i) * 2) + Double(i) * 0.15
+                BatShape()
+                    .fill(accent.opacity(0.7))
+                    .frame(width: 16 + CGFloat(i) * 3, height: 8 + CGFloat(i) * 1.5)
+                    .scaleEffect(x: 1, y: 0.55 + 0.45 * abs(sin(t * 11 + Double(i))))  // wing flaps
+                    .shadow(color: accent.opacity(0.5), radius: 3)
+                    .position(x: g.size.width * x, y: g.size.height * y)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// Bat silhouette: pointed ears, scalloped wings.
+struct BatShape: Shape {
+    func path(in r: CGRect) -> Path {
+        let w = r.width, h = r.height
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: r.minX + x * w, y: r.minY + y * h) }
+        var p = Path()
+        p.move(to: pt(0, 0.15))
+        p.addQuadCurve(to: pt(0.4, 0.38), control: pt(0.22, 0.05))
+        p.addLine(to: pt(0.44, 0.12))   // left ear
+        p.addLine(to: pt(0.5, 0.3))
+        p.addLine(to: pt(0.56, 0.12))   // right ear
+        p.addLine(to: pt(0.6, 0.38))
+        p.addQuadCurve(to: pt(1, 0.15), control: pt(0.78, 0.05))
+        // Scalloped trailing edge of the right wing, the body, then the left wing.
+        p.addQuadCurve(to: pt(0.82, 0.6), control: pt(0.95, 0.5))
+        p.addQuadCurve(to: pt(0.66, 0.62), control: pt(0.76, 0.45))
+        p.addQuadCurve(to: pt(0.5, 1.0), control: pt(0.6, 0.95))
+        p.addQuadCurve(to: pt(0.34, 0.62), control: pt(0.4, 0.95))
+        p.addQuadCurve(to: pt(0.18, 0.6), control: pt(0.24, 0.45))
+        p.addQuadCurve(to: pt(0, 0.15), control: pt(0.05, 0.5))
+        p.closeSubpath()
+        return p
     }
 }

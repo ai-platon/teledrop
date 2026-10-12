@@ -80,3 +80,22 @@ save("sent",     mix((0, bell(1568, 0.25, 0.35)), (0.09, bell(2093, 0.35, 0.3)))
 save("error",    mix((0, tone(233, 220, 0.3, attack=0.01, decay=0.1, amp=0.4)), (0, tone(247, 235, 0.3, attack=0.01, decay=0.1, amp=0.25))))
 save("close",    tone(620, 300, 0.1, attack=0.006, decay=0.035, amp=0.3))
 print("\n".join(sorted(os.listdir(OUT))))
+
+
+def vibrato(f0, f1, dur, rate=6.0, depth=0.03, amp=0.4, attack=0.06, decay=None):
+    """Ghostly wavering glide."""
+    n, decay = int(RATE * dur), decay or dur / 2
+    out, phase = [], 0.0
+    for i in range(n):
+        t = i / RATE
+        f = f0 * (f1 / f0) ** (t / dur) * (1 + depth * math.sin(2 * math.pi * rate * t))
+        phase += 2 * math.pi * f / RATE
+        env = min(1.0, t / attack) * math.exp(-t / decay)
+        out.append(amp * env * (math.sin(phase) + 0.25 * math.sin(2 * phase)))
+    return out
+
+
+# Halloween
+save("boo",    mix((0, vibrato(330, 520, 0.45, amp=0.45)), (0.05, noise(0.35, 0.06, 0.15, seed=9))))
+save("spooky", mix(*[(i * 0.11, bell(f, 0.5, 0.3)) for i, f in enumerate((784, 932, 1109, 1568))]))
+print("halloween sounds ok")

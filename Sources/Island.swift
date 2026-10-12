@@ -15,13 +15,13 @@ struct ProgressBar: View {
                         // Still receiving / preparing the file: a blue glint runs along the track.
                         let x = (t * 0.9).truncatingRemainder(dividingBy: 1.4) - 0.2
                         Capsule()
-                            .fill(LinearGradient(colors: [.clear, telegramBlue, Color(red: 0.45, green: 0.85, blue: 1), .clear],
+                            .fill(LinearGradient(colors: [.clear, accent, accentLight, .clear],
                                                  startPoint: .leading, endPoint: .trailing))
                             .frame(width: g.size.width * 0.35)
                             .offset(x: g.size.width * x)
                     } else {
                         Capsule()
-                            .fill(LinearGradient(colors: [Color(red: 0.3, green: 0.78, blue: 1), telegramBlue],
+                            .fill(LinearGradient(colors: [accentLight, accent],
                                                  startPoint: .leading, endPoint: .trailing))
                             .frame(width: max(5, g.size.width * value))
                             .overlay(
@@ -51,11 +51,12 @@ struct DropZone: View {
             let pulse = 0.5 + 0.5 * sin(t * 2.6)
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(RadialGradient(colors: [telegramBlue.opacity(0.26 + 0.14 * pulse), telegramBlue.opacity(0.05), .clear],
+                    .fill(RadialGradient(colors: [accent.opacity(0.26 + 0.14 * pulse), accent.opacity(0.05), .clear],
                                          center: .bottom, startRadius: 4, endRadius: 200))
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(telegramBlue.opacity(0.7 + 0.25 * pulse),
+                    .strokeBorder(accent.opacity(0.7 + 0.25 * pulse),
                                   style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [6, 5], dashPhase: -t * 16))
+                if Theme.isHalloween { Bats(t: t, count: 3) }
                 HStack(spacing: 0) {
                     VStack(spacing: 8) {
                         Text(tr("Drop files here", "Брось файлы сюда", "Кидай файли сюди"))
@@ -77,10 +78,10 @@ struct DropZone: View {
     private func chip(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(telegramBlue.opacity(0.95))
+            .foregroundStyle(accent.opacity(0.95))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Capsule().fill(telegramBlue.opacity(0.14)))
+            .background(Capsule().fill(accent.opacity(0.14)))
     }
 }
 
@@ -148,8 +149,8 @@ struct IslandView: View {
         ZStack(alignment: .leading) {
             shape.fill(.black)
                 .shadow(color: .black.opacity(0.45), radius: 14, y: 6)
-                .shadow(color: telegramBlue.opacity(hover ? 0.5 : 0), radius: 18)
-                .overlay(shape.stroke(telegramBlue.opacity(hover ? 0.5 : 0), lineWidth: 1))
+                .shadow(color: accent.opacity(hover ? 0.5 : 0), radius: 18)
+                .overlay(shape.stroke(accent.opacity(hover ? 0.5 : 0), lineWidth: 1))
                 .overlay(shape.stroke(.white.opacity(hover ? 0 : 0.08), lineWidth: 1))
 
             Group {

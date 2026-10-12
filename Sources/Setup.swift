@@ -70,7 +70,7 @@ struct SetupView: View {
 
     var body: some View {
         ZStack {
-            RadialGradient(colors: [telegramBlue.opacity(0.22), .clear], center: .top, startRadius: 0, endRadius: 360)
+            RadialGradient(colors: [accent.opacity(0.22), .clear], center: .top, startRadius: 0, endRadius: 360)
                 .ignoresSafeArea()
             VStack(spacing: 0) {
                 header
@@ -159,6 +159,7 @@ struct SetupView: View {
                     .padding(12)
                     .drawingGroup()
                     .padding(-12)
+                    .background { if Theme.isHalloween { Bats(t: t, count: 2).frame(width: 220, height: 80) } }
             }
             .frame(height: 70)
             Text("TeleDrop")
@@ -182,7 +183,7 @@ struct SetupView: View {
                 Label(tr("Then just come back here — I'll pick the token up", "Потом просто вернись сюда — я подхвачу токен", "Потім просто повернися сюди — я підхоплю токен"),
                       systemImage: "sparkles")
                     .font(.system(size: 12))
-                    .foregroundStyle(telegramBlue)
+                    .foregroundStyle(accent)
             }
             HStack {
                 SecondaryButton(title: tr("Open @BotFather", "Открыть @BotFather", "Відкрити @BotFather"), icon: "arrow.up.right", sound: .open) { openTelegram("BotFather") }
@@ -335,7 +336,7 @@ struct SetupView: View {
         VStack(spacing: 14) {
             Card {
                 HStack(spacing: 12) {
-                    Circle().fill(telegramBlue.gradient).frame(width: 38, height: 38)
+                    Circle().fill(accent.gradient).frame(width: 38, height: 38)
                         .overlay(Image(systemName: "paperplane.fill").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("@\(botUsername)").font(.system(size: 14, weight: .semibold))
@@ -368,6 +369,8 @@ struct SetupView: View {
                     .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
                 SettingToggle(title: tr("Sounds", "Звуки", "Звуки"), isOn: $sounds)
                     .onChange(of: sounds) { _, on in Settings.soundsOn = on }
+                SettingToggle(title: tr("Halloween 🎃", "Хэллоуин 🎃", "Гелловін 🎃"),
+                              isOn: Binding(get: { model.halloween }, set: { model.setHalloween($0) }))
                 if CoucouWatcher.isInstalled {
                     SettingToggle(title: tr("Make room for expanded Coucou", "Уступать место раскрытому Coucou", "Ставати поруч із Coucou"), isOn: $avoidCoucou)
                         .onChange(of: avoidCoucou) { _, on in Settings.avoidCoucou = on }
@@ -385,7 +388,7 @@ struct SetupView: View {
                     NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/Library/Logs/TeleDrop.log"))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(telegramBlue)
+                .foregroundStyle(accent)
                 Spacer()
                 SecondaryButton(title: tr("Show animation", "Показать анимацию", "Показати анімацію"), icon: "sparkles") { model.demo() }
             }
@@ -412,8 +415,8 @@ struct SetupView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .frame(height: 52)
-            .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(telegramBlue.gradient))
-            .shadow(color: telegramBlue.opacity(0.45), radius: 10, y: 3)
+            .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(accent.gradient))
+            .shadow(color: accent.opacity(0.45), radius: 10, y: 3)
         }
         .buttonStyle(PressStyle())
         .keyboardShortcut(.defaultAction)
@@ -552,9 +555,9 @@ struct Instruction: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text("\(n)")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(telegramBlue)
+                .foregroundStyle(accent)
                 .frame(width: 20, height: 20)
-                .background(Circle().fill(telegramBlue.opacity(0.15)))
+                .background(Circle().fill(accent.opacity(0.15)))
             Text(text).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -590,7 +593,7 @@ struct SettingToggle: View {
         HStack {
             Text(title).font(.system(size: 13))
             Spacer()
-            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).tint(telegramBlue).controlSize(.small)
+            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).tint(accent).controlSize(.small)
                 .onChange(of: isOn) { _, _ in Sfx.toggle.play(volume: 0.4) }
         }
     }
@@ -601,13 +604,13 @@ struct Tip: View {
     var text: String
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: icon).font(.system(size: 15)).foregroundStyle(telegramBlue)
+            Image(systemName: icon).font(.system(size: 15)).foregroundStyle(accent)
             Text(text).font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(telegramBlue.opacity(0.08)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(accent.opacity(0.08)))
     }
 }
 
@@ -618,7 +621,7 @@ struct StepDots: View {
         HStack(spacing: 6) {
             ForEach(0..<count, id: \.self) { i in
                 Capsule()
-                    .fill(i <= current ? telegramBlue : .white.opacity(0.15))
+                    .fill(i <= current ? accent : .white.opacity(0.15))
                     .frame(width: i == current ? 22 : 7, height: 7)
             }
         }
@@ -632,7 +635,7 @@ struct WaitingDots: View {
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(spacing: 4) {
                 ForEach(0..<3, id: \.self) { i in
-                    Circle().fill(telegramBlue)
+                    Circle().fill(accent)
                         .frame(width: 6, height: 6)
                         .opacity(0.3 + 0.7 * max(0, sin(t * 4 - Double(i) * 0.7)))
                 }
@@ -660,8 +663,8 @@ struct PrimaryButton: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 18)
             .frame(height: 36)
-            .background(Capsule().fill(telegramBlue.opacity(enabled ? (hovering ? 1 : 0.9) : 0.3)))
-            .shadow(color: telegramBlue.opacity(enabled ? 0.4 : 0), radius: hovering ? 12 : 6, y: 2)
+            .background(Capsule().fill(accent.opacity(enabled ? (hovering ? 1 : 0.9) : 0.3)))
+            .shadow(color: accent.opacity(enabled ? 0.4 : 0), radius: hovering ? 12 : 6, y: 2)
         }
         .buttonStyle(PressStyle())
         .disabled(!enabled)

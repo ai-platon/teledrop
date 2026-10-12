@@ -58,6 +58,12 @@ enum Settings {
         set { defaults.set(newValue.rawValue, forKey: "language") }
     }
 
+    /// nil = automatic (on in October).
+    static var halloween: Bool? {
+        get { defaults.object(forKey: "halloween") as? Bool }
+        set { defaults.set(newValue, forKey: "halloween") }
+    }
+
     static var soundsOn: Bool {
         get { defaults.object(forKey: "sounds") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "sounds") }

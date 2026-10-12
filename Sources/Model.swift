@@ -23,6 +23,8 @@ final class DropModel: ObservableObject {
     @Published var menuBarHeight: CGFloat = 37
     /// Hanging from the notch itself (no Coucou): grow around the notch, content below it.
     @Published var centered = false
+    /// Mirrors Theme.isHalloween so views redraw when it changes.
+    @Published var halloween = Theme.isHalloween
     /// Mirrors Settings.language so views redraw when it changes.
     @Published var language = Settings.language
     /// Set by visual tests so the drag watcher doesn't collapse a frozen state.
@@ -176,6 +178,13 @@ final class DropModel: ObservableObject {
     }
 
     /// Plays the whole animation without sending anything.
+    func setHalloween(_ on: Bool) {
+        Settings.halloween = on
+        Theme.override = on
+        withAnimation(.easeInOut(duration: 0.4)) { halloween = on }
+        (on ? Sfx.boo : Sfx.toggle).play()
+    }
+
     func cycleLanguage() {
         Settings.language = Settings.language.next
         Sfx.language.play()
@@ -211,10 +220,11 @@ final class DropModel: ObservableObject {
         if new == .sending { EngineSound.shared.start(); EngineSound.shared.set(progress: progress) }
         if old == .sending { EngineSound.shared.stop() }
         switch (old, new) {
-        case (.hidden, .peek), (.done, .peek), (.error, .peek): Sfx.peek.play(volume: 0.3)
+        case (.hidden, .peek), (.done, .peek), (.error, .peek):
+            Theme.isHalloween ? Sfx.boo.play(volume: 0.35) : Sfx.peek.play(volume: 0.3)
         case (.peek, .hover): Sfx.hover.play(volume: 0.35)
         case (.hover, .sending), (.hidden, .sending): Sfx.drop.play()
-        case (.sending, .done): Sfx.sent.play(volume: 0.4)
+        case (.sending, .done): (Theme.isHalloween ? Sfx.spooky : Sfx.sent).play(volume: 0.4)
         case (_, .error): Sfx.error.play(volume: 0.4)
         case (.peek, .hidden), (.hover, .hidden): Sfx.close.play(volume: 0.25)
         default: break

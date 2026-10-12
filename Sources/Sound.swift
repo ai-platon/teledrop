@@ -6,6 +6,8 @@ enum Sfx: String {
     case tap, next, back, open, paste, valid, invalid, found, toggle, language, send
     // Island at the notch
     case peek, hover, drop, sent, error, close
+    // Halloween
+    case boo, spooky
 
     private static var cache: [Sfx: NSSound] = [:]
 
