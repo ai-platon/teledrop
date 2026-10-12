@@ -97,5 +97,8 @@ def vibrato(f0, f1, dur, rate=6.0, depth=0.03, amp=0.4, attack=0.06, decay=None)
 
 # Halloween
 save("boo",    mix((0, vibrato(330, 520, 0.45, amp=0.45)), (0.05, noise(0.35, 0.06, 0.15, seed=9))))
+# Twice as long, for switching the theme on: a slower, deeper ghost wail.
+save("boolong", mix((0, vibrato(300, 540, 0.9, rate=4.5, depth=0.04, amp=0.45, attack=0.12, decay=0.6)),
+                    (0.1, noise(0.7, 0.06, 0.3, seed=9))))
 save("spooky", mix(*[(i * 0.11, bell(f, 0.5, 0.3)) for i, f in enumerate((784, 932, 1109, 1568))]))
 print("halloween sounds ok")

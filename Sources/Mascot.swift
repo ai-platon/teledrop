@@ -6,14 +6,14 @@ enum Theme {
     static let pumpkin = Color(red: 1.0, green: 0.55, blue: 0.1)
     static let stem = Color(red: 0.27, green: 0.45, blue: 0.18)
 
-    /// Set by the app from Settings (nil = automatic: October through November 2).
+    /// Set by the app from Settings (nil = automatic: October 20 through November 5).
     static var override: Bool?
 
     static var isHalloween: Bool { override ?? inSeason }
 
     static var inSeason: Bool {
         let c = Calendar.current.dateComponents([.month, .day], from: Date())
-        return c.month == 10 || (c.month == 11 && (c.day ?? 99) <= 2)
+        return (c.month == 10 && (c.day ?? 0) >= 20) || (c.month == 11 && (c.day ?? 99) <= 5)
     }
 }
 

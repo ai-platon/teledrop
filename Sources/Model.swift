@@ -182,7 +182,7 @@ final class DropModel: ObservableObject {
         Settings.halloween = on
         Theme.override = on
         withAnimation(.easeInOut(duration: 0.4)) { halloween = on }
-        (on ? Sfx.boo : Sfx.toggle).play()
+        (on ? Sfx.boolong : Sfx.toggle).play()
     }
 
     func cycleLanguage() {
