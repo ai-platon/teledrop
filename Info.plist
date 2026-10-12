@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key><string>app.teledrop.TeleDrop</string>
+	<key>CFBundleName</key><string>TeleDrop</string>
+	<key>CFBundleDisplayName</key><string>TeleDrop</string>
+	<key>CFBundleExecutable</key><string>TeleDrop</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>1.0</string>
+	<key>CFBundleVersion</key><string>1</string>
+	<key>LSMinimumSystemVersion</key><string>14.0</string>
+	<key>LSUIElement</key><true/>
+	<key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<key>NSHumanReadableCopyright</key><string>© 2026 TeleDrop contributors. MIT License.</string>
+	<key>NSDesktopFolderUsageDescription</key><string>TeleDrop sends the files you drop from your Desktop to your Telegram bot.</string>
+	<key>NSDocumentsFolderUsageDescription</key><string>TeleDrop sends the files you drop from Documents to your Telegram bot.</string>
+	<key>NSDownloadsFolderUsageDescription</key><string>TeleDrop sends the files you drop from Downloads to your Telegram bot.</string>
+</dict>
+</plist>

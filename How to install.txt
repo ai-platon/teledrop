@@ -1,0 +1,30 @@
+TeleDrop — drag files to your MacBook's notch, get them in Telegram.
+
+INSTALL
+1. Drag TeleDrop into Applications.
+2. Open TeleDrop. macOS will say it can't verify the developer —
+   that's normal for apps outside the App Store.
+   Open System Settings → Privacy & Security, scroll down and click
+   "Open Anyway" next to TeleDrop.
+3. The setup window opens: create a bot in @BotFather, paste its token,
+   press Start in your bot. Done.
+
+HOW TO USE
+• Start dragging any file — an island "To Telegram" appears next to the notch.
+• Move the file onto the island and let go.
+• Files up to 49 MB are sent as is. Bigger ones are zipped; a zip that is still
+  too big is split into .001, .002… parts (open with 7-Zip, The Unarchiver,
+  Keka, or the cat command).
+• The paper plane in the menu bar: settings, pick files, quit.
+
+macOS MAY ASK FOR
+• Desktop / Documents / Downloads access — to read the file you dropped.
+• Screen Recording — only if Coucou is installed: TeleDrop checks whether
+  Coucou is open and moves aside. You can decline; everything else works.
+
+PRIVACY
+The bot token stays on your Mac. Files go straight to Telegram, to your bot —
+nowhere else.
+
+UNINSTALL
+Quit TeleDrop (paper plane → Quit) and delete it from Applications.
