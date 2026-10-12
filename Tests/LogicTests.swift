@@ -42,6 +42,29 @@ check(Theme.inSeason(day(11, 5)), "Nov 5 → Halloween")
 check(!Theme.inSeason(day(11, 6)), "Nov 6 → classic")
 check(!Theme.inSeason(day(3, 1)), "March → classic")
 
+print("Island layout on every MacBook screen")
+// (name, width in points at default scaling, has notch). Coucou's open panel ends ~318 pt right of center.
+let screens: [(String, CGFloat, Bool)] = [
+    ("Air 13\" (M2–M4)", 1470, true), ("Air 13\" larger text", 1280, true), ("Air 13\" more space", 1710, true),
+    ("Pro 14\"", 1512, true), ("Air 15\"", 1710, true), ("Pro 16\"", 1728, true),
+    ("Pro 13\" / old Air (no notch)", 1440, false), ("Air 13\" M1 smallest", 1280, false),
+]
+for (name, width, notch) in screens {
+    let mid = width / 2
+    let notchRight = mid + (notch ? 92 : 100)
+    var cases: [(String, CGFloat)] = [("beside notch", notchRight + 2), ("beside Coucou pills", notchRight + 75 + 10)]
+    cases.append(("beside open Coucou", mid + 318 + 12))
+    for (label, anchor) in cases {
+        let p = Layout.beside(anchor: anchor, screenMaxX: width)
+        let fits = p.left + p.maxWidth <= width - Layout.margin + 0.5
+        let clear = p.left >= anchor - 0.5 || p.maxWidth == Layout.minWidth
+        check(fits && clear && p.maxWidth >= Layout.minWidth,
+              "\(name), \(label): island \(Int(p.maxWidth)) pt wide, fits on screen, doesn't cover Coucou")
+    }
+    let centered = Layout.centered(screenWidth: width)
+    check(centered <= width - 2 * Layout.margin, "\(name), no Coucou: centered island \(Int(centered)) pt fits")
+}
+
 print("Packing big files")
 let fm = FileManager.default
 let dir = fm.temporaryDirectory.appendingPathComponent("teledrop-tests-\(UUID().uuidString)")

@@ -84,7 +84,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
             notchRight = screenFrame.midX + (screenFrame.width - left.width - right.width) / 2
         }
-        model.menuBarHeight = screen.safeAreaInsets.top > 0 ? screen.safeAreaInsets.top : NSStatusBar.system.thickness
+        model.hasNotch = screen.safeAreaInsets.top > 0
+        model.menuBarHeight = model.hasNotch ? screen.safeAreaInsets.top : NSStatusBar.system.thickness
         placePanel(animated: false)
     }
 
@@ -103,8 +104,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     islandLeft = max(islandLeft, collapsed + 10)
                 }
             }
-            x = min(islandLeft, screenFrame.maxX - 420) - IslandView.leadingInset
+            let placement = Layout.beside(anchor: islandLeft, screenMaxX: screenFrame.maxX)
+            let width = model.testMaxWidth ?? placement.maxWidth
+            if model.maxWidth != width { model.maxWidth = width }
+            x = placement.left - IslandView.leadingInset
         } else {
+            let width = model.testMaxWidth ?? Layout.centered(screenWidth: screenFrame.width)
+            if model.maxWidth != width { model.maxWidth = width }
             x = screenFrame.midX - s.width / 2
         }
         if model.centered == besideCoucou { model.centered = !besideCoucou }

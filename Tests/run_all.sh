@@ -31,7 +31,7 @@ done
 print "2. Logic"
 mkdir -p $TMP/teledrop-logic-src && cp Tests/LogicTests.swift $TMP/teledrop-logic-src/main.swift
 swiftc -swift-version 5 $TMP/teledrop-logic-src/main.swift Sources/Telegram.swift Sources/Settings.swift Sources/Lang.swift \
-  Sources/Log.swift Sources/Mascot.swift -o $TMP/teledrop-logic 2>/dev/null && $TMP/teledrop-logic \
+  Sources/Log.swift Sources/Mascot.swift Sources/Layout.swift -o $TMP/teledrop-logic 2>/dev/null && $TMP/teledrop-logic \
   && ok "logic tests" || bad "logic tests"
 
 print "3. Island — every state, both themes, all languages"
@@ -43,7 +43,7 @@ for theme in classic halloween; do
   for lang in en uk ru; do
     defaults write $DOMAIN language -string $lang
     relaunch
-    states=(peek hover sending done error)
+    states=(peek hover compact sending done error)
     [[ $lang != en ]] && states=(hover done)
     for st in $states; do
       post $st; sleep 1.3

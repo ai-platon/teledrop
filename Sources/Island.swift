@@ -44,6 +44,7 @@ struct ProgressBar: View {
 /// Coucou-style drop zone, in Telegram blue: dashed marching border, pulsing glow, file chips.
 struct DropZone: View {
     var look: CGSize
+    var compact = false
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60)) { context in
@@ -60,16 +61,17 @@ struct DropZone: View {
                 HStack(spacing: 0) {
                     VStack(spacing: 8) {
                         Text(tr("Drop files here", "Брось файлы сюда", "Кидай файли сюди"))
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: compact ? 12 : 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.8))
                         HStack(spacing: 6) {
-                            ForEach([tr("Photos", "Фото", "Фото"), tr("Videos", "Видео", "Відео"), "PDF", tr("Archives", "Архивы", "Архіви")], id: \.self) { chip($0) }
+                            let chips = [tr("Photos", "Фото", "Фото"), tr("Videos", "Видео", "Відео"), "PDF", tr("Archives", "Архивы", "Архіви")]
+                            ForEach(compact ? Array(chips.prefix(3)) : chips, id: \.self) { chip($0) }
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    Blob(mood: .excited, look: look, size: 50)
+                    Blob(mood: .excited, look: look, size: compact ? 40 : 50)
                         .offset(y: 3 * sin(t * 3.2))
-                        .padding(.trailing, 16)
+                        .padding(.trailing, compact ? 12 : 16)
                 }
             }
         }
@@ -94,14 +96,18 @@ struct IslandView: View {
     private var expanded: Bool { m.phase != .peek && m.phase != .hidden }
 
     /// Room the content leaves for the camera notch when the island hangs from it.
-    private var notchClearance: CGFloat { m.centered ? m.menuBarHeight - 6 : 0 }
+    private var notchClearance: CGFloat { m.centered && m.hasNotch ? m.menuBarHeight - 6 : 0 }
+
+    /// Narrow spot (13" screen next to an open Coucou): a tighter drop zone.
+    private var compact: Bool { m.maxWidth < 350 }
 
     private var size: CGSize {
         switch m.phase {
         case .hidden: CGSize(width: 150, height: 10)
-        case .peek: CGSize(width: m.centered ? 250 : 214, height: m.menuBarHeight + (m.centered ? 40 : 14))
-        case .hover: CGSize(width: 380, height: 128 + notchClearance)
-        default: CGSize(width: 320, height: 100 + notchClearance)
+        case .peek: CGSize(width: m.centered && m.hasNotch ? 250 : 214,
+                           height: m.menuBarHeight + (m.centered && m.hasNotch ? 40 : 14))
+        case .hover: CGSize(width: min(380, m.maxWidth), height: (compact ? 112 : 128) + notchClearance)
+        default: CGSize(width: min(320, m.maxWidth), height: 100 + notchClearance)
         }
     }
 
@@ -165,7 +171,7 @@ struct IslandView: View {
 
             Group {
                 if hover {
-                    DropZone(look: m.look)
+                    DropZone(look: m.look, compact: compact)
                         .padding(.horizontal, Self.flare + 10)
                         .padding(.top, 10 + notchClearance)
                         .padding(.bottom, 12)
@@ -174,7 +180,7 @@ struct IslandView: View {
                     content
                         .padding(.leading, Self.flare + (expanded ? 18 : 12))
                         .padding(.trailing, Self.flare + 16)
-                        .padding(.top, m.phase == .peek && m.centered ? m.menuBarHeight : notchClearance)
+                        .padding(.top, m.phase == .peek && m.centered && m.hasNotch ? m.menuBarHeight : notchClearance)
                         .transition(.opacity)
                 }
             }

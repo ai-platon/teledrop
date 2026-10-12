@@ -28,6 +28,12 @@ final class DropModel: ObservableObject {
     @Published var menuBarHeight: CGFloat = 37
     /// Hanging from the notch itself (no Coucou): grow around the notch, content below it.
     @Published var centered = false
+    /// Screens without a notch (13" Pro, older Air) need no room for a camera.
+    @Published var hasNotch = true
+    /// How wide the island may get where it sits (narrower on 13" screens next to Coucou).
+    @Published var maxWidth = Layout.fullWidth
+    /// Visual tests pin a width (e.g. a 13" screen next to an open Coucou).
+    var testMaxWidth: CGFloat?
     /// Mirrors Theme.isHalloween so views redraw when it changes.
     @Published var halloween = Theme.isHalloween
     /// Mirrors Settings.language so views redraw when it changes.
@@ -289,10 +295,12 @@ final class DropModel: ObservableObject {
         hideWork?.cancel()
         demoTimer?.invalidate()
         pinned = name != "hidden"
+        if name != "compact" { testMaxWidth = nil }
         botName = botName ?? "my_bot"
         switch name {
         case "peek": phase = .peek
         case "hover": phase = .peek; phase = .hover
+        case "compact": testMaxWidth = 302; maxWidth = 302; phase = .peek; phase = .hover  // 13" next to an open Coucou
         case "sending": detail = tr("vacation-2026.jpg", "отпуск-2026.jpg", "відпустка-2026.jpg"); progress = 0.42; phase = .sending
         case "done": detail = filesCount(3) + " → @\(botName!)"; phase = .done
         case "error": detail = tr("Press Start in your bot in Telegram", "Нажми Start у бота в Telegram", "Натисни Start у бота в Telegram"); phase = .error
