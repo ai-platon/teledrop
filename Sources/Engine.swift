@@ -1,7 +1,7 @@
 import AVFoundation
 
-/// A synthesized supercar engine that revs with upload progress: three gears, the revs climb
-/// within each gear and drop at every shift. Generated live, so it follows the progress smoothly.
+/// A synthesized supercar engine that revs with upload progress: one long, smooth pull from idle
+/// to redline, getting louder as it goes. Generated live, so it follows the progress smoothly.
 final class EngineSound {
     static let shared = EngineSound()
 
@@ -13,7 +13,6 @@ final class EngineSound {
     // Written on the main thread, read by the audio thread.
     private var targetHz = 38.0
     private var targetGain = 0.0
-    private var shiftKick = 0.0
 
     // Audio-thread state.
     private var hz = 38.0
@@ -22,7 +21,6 @@ final class EngineSound {
     private var whinePhase = 0.0
     private var noise = 0.0
     private var seed: UInt32 = 0x1234_5678
-    private var gear = 0
 
     private init() {
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
@@ -40,22 +38,21 @@ final class EngineSound {
     func start() {
         guard Settings.soundsOn else { return }
         stopWork?.cancel()
-        gear = 0
         targetHz = 38
-        targetGain = 1
+        targetGain = Self.gain(at: 0)
         if !engine.isRunning { try? engine.start() }
     }
 
-    /// 0…1. Revs climb inside each third, and fall back at every gear change.
+    /// 0…1: revs and volume both climb with the upload, no gear changes.
     func set(progress: Double) {
         guard engine.isRunning else { return }
         let p = max(0, min(1, progress))
-        let newGear = min(2, Int(p * 3))
-        let inGear = p * 3 - Double(newGear)
-        if newGear > gear { shiftKick = 1 }  // pop of the shift
-        gear = newGear
-        targetHz = 42 + Double(newGear) * 10 + inGear * (95 + Double(newGear) * 20)
+        targetHz = 40 + p * 180
+        targetGain = Self.gain(at: p)
     }
+
+    /// Quiet idle at the start, full volume at 100%.
+    private static func gain(at progress: Double) -> Double { 0.12 + 0.88 * progress * progress }
 
     /// Lets the engine wind down, then frees the audio hardware.
     func stop() {
@@ -71,9 +68,8 @@ final class EngineSound {
     }
 
     private func nextSample() -> Double {
-        // Revs glide (faster when dropping, like a real shift); volume fades in and out.
-        let glide = targetHz < hz ? 0.0016 : 0.00045
-        hz += (targetHz - hz) * glide
+        // Revs and volume glide toward their targets so the pull is smooth.
+        hz += (targetHz - hz) * 0.0005
         gain += (targetGain - gain) * 0.0007
 
         phase += hz / sampleRate
@@ -90,13 +86,8 @@ final class EngineSound {
         let white = Double(seed) / Double(UInt32.max) * 2 - 1
         noise += (white - noise) * 0.08
         s += noise * (0.25 + hz / 300)
-        // Turbo/gearbox whine on top.
+        // Turbo whine on top.
         s += sin(whinePhase * 2 * .pi) * 0.05 * min(1, hz / 120)
-        // Crackle at a gear change.
-        if shiftKick > 0.001 {
-            s += white * shiftKick * 0.6
-            shiftKick *= 0.9994
-        }
         return s * gain * 0.16
     }
 }
