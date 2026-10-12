@@ -14,7 +14,9 @@ final class DropModel: ObservableObject {
             onPhaseChange?(phase)
         }
     }
-    @Published var progress: Double = 0
+    @Published var progress: Double = 0 {
+        didSet { if phase == .sending { EngineSound.shared.set(progress: progress) } }
+    }
     @Published var detail = ""
     @Published var look: CGSize = .zero
     @Published var botName: String?
@@ -205,6 +207,9 @@ final class DropModel: ObservableObject {
 
     /// Every island state change has its own sound, so it can be followed by ear.
     private func playSound(from old: Phase, to new: Phase) {
+        // The engine revs for as long as something is uploading.
+        if new == .sending { EngineSound.shared.start(); EngineSound.shared.set(progress: progress) }
+        if old == .sending { EngineSound.shared.stop() }
         switch (old, new) {
         case (.hidden, .peek), (.done, .peek), (.error, .peek): Sfx.peek.play(volume: 0.3)
         case (.peek, .hover): Sfx.hover.play(volume: 0.35)
